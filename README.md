@@ -79,6 +79,12 @@ Das Spiel funktioniert auch in einem `<iframe>`:
 <iframe src="/games/neon-hop/index.html" allow="autoplay; fullscreen" style="border:0;width:100%;aspect-ratio:16/9"></iframe>
 ```
 
+## Toki-Bestenliste
+
+Nach jedem Tod und jedem Zieleinlauf im normalen Modus meldet das Spiel
+`toki.score(punkte)`. Die Punkte sind die **Summe der Bestwerte aller Level**
+(0–100 % pro Level, also bis zu 1500 Punkte für alle 15 Level). Übungsmodus zählt nicht.
+
 ## Mehrspieler
 
 Im Menü auf **Mehrspieler** tippen, Namen eingeben und einen Raum erstellen. Der

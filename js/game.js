@@ -943,6 +943,18 @@
     A.sfx('click');
   }
 
+  /**
+   * Punkte für die Toki-Bestenliste: Summe der Bestwerte (normaler Modus)
+   * über alle Level, also 0–100 pro Level und 1500 für alle 15 geschafft.
+   * Der Wert kann nur steigen, egal welches Level gerade gespielt wird.
+   */
+  function totalScore() {
+    return window.LEVELS.reduce((sum, def) => sum + levelSave(def.id).best, 0);
+  }
+  function reportScore() {
+    try { if (window.toki && typeof window.toki.score === 'function') window.toki.score(totalScore()); } catch (e) { /* egal */ }
+  }
+
   function onDeath() {
     const s = game.state;
     A.sfx('die');
@@ -955,7 +967,7 @@
     if (game.practice) sv.practice = Math.max(sv.practice, pct);
     else sv.best = Math.max(sv.best, pct);
     writeSave();
-    if (!game.practice) window.toki?.score(pct);
+    if (!game.practice) reportScore();
   }
 
   function onWin() {
@@ -979,7 +991,7 @@
       });
     }
     writeSave();
-    if (!game.practice) window.toki?.score(100);
+    if (!game.practice) reportScore();
     for (let i = 0; i < 6; i++) {
       setTimeout(() => burst(s.x - 2 + Math.random() * 4, 3 + Math.random() * 5,
         ['#ffd84a', '#5ee6ff', '#ff5ec8'], 24, 7), i * 160);
@@ -1542,5 +1554,5 @@
   requestAnimationFrame(frame);
 
   // für Tests / Einbettung
-  window.NeonHop = { game, startLevel, goMenu, mp, joinRoom: (code) => mpJoinCode(code) };
+  window.NeonHop = { game, startLevel, goMenu, mp, totalScore, joinRoom: (code) => mpJoinCode(code) };
 })();
