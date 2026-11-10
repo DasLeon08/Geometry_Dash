@@ -161,7 +161,14 @@
       filter: drop-shadow(0 0 22px rgba(120, 170, 255, 0.5));
     }
     .tagline { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
-    .menu-actions { display: flex; gap: 10px; }
+    .menu-actions { display: flex; align-items: center; gap: 10px; }
+    .pager { display: flex; align-items: center; gap: 8px; margin-right: 6px; }
+    .pager .icon-btn { width: 44px; height: 44px; }
+    .pager .icon-btn:disabled { opacity: 0.3; cursor: default; }
+    .page-label { min-width: 92px; text-align: center; font-size: 13px; font-weight: 800; color: var(--muted); }
+    .page-label b { display: block; font-size: 18px; color: var(--text); }
+    .levels.turn { animation: turn .22s ease; }
+    @keyframes turn { from { opacity: 0; transform: translateX(var(--dir, 20px)); } to { opacity: 1; transform: none; } }
 
     .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
     .card {
@@ -188,6 +195,7 @@
     .card-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .badge { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 900; color: #0b1030; }
     .badge.d1 { background: #7dff9a; } .badge.d2 { background: #ffd84a; } .badge.d3 { background: #ff6b8b; }
+    .badge.d4 { background: linear-gradient(90deg, #c58cff, #ff5ec8); color: #fff; box-shadow: 0 0 12px rgba(255, 94, 200, 0.6); }
     .mini-coins { display: flex; gap: 5px; }
     .mini-coins i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.3); }
     .mini-coins i.got { border: 0; background: radial-gradient(circle at 35% 30%, #fff6c4, var(--gold) 50%, #c99700); box-shadow: 0 0 8px rgba(255, 216, 74, .7); }
@@ -244,6 +252,9 @@
       .overlay { padding: 10px; }
       .menu-top { margin-bottom: 10px; }
       h1.logo { font-size: 38px; }
+      .page-label { min-width: 70px; font-size: 11px; }
+      .page-label b { font-size: 15px; }
+      .pager .icon-btn, .menu-actions .icon-btn { width: 40px; height: 40px; }
       .tagline, .controls { display: none; }
       .card-art { height: 64px; }
       .card-body { padding: 10px 12px 12px; gap: 7px; }
@@ -278,6 +289,8 @@
     <symbol id="i-sound" viewBox="0 0 24 24"><path d="M11 4.4v15.2a1 1 0 0 1-1.7.7L5.6 16H3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h2.6l3.7-4.3a1 1 0 0 1 1.7.7zM15.5 8.2a1.1 1.1 0 0 1 1.6 0 5.4 5.4 0 0 1 0 7.6 1.1 1.1 0 1 1-1.6-1.6 3.2 3.2 0 0 0 0-4.4 1.1 1.1 0 0 1 0-1.6zm3-3a1.1 1.1 0 0 1 1.6 0 9.6 9.6 0 0 1 0 13.6 1.1 1.1 0 1 1-1.6-1.6 7.4 7.4 0 0 0 0-10.4 1.1 1.1 0 0 1 0-1.6z"/></symbol>
     <symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 4.4v15.2a1 1 0 0 1-1.7.7L5.6 16H3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h2.6l3.7-4.3a1 1 0 0 1 1.7.7zM15.3 8.8a1.1 1.1 0 0 1 1.6 0l1.6 1.6 1.6-1.6a1.1 1.1 0 1 1 1.6 1.6L20.1 12l1.6 1.6a1.1 1.1 0 1 1-1.6 1.6l-1.6-1.6-1.6 1.6a1.1 1.1 0 1 1-1.6-1.6l1.6-1.6-1.6-1.6a1.1 1.1 0 0 1 0-1.6z"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M9.5 16.2 5.3 12a1.2 1.2 0 1 0-1.7 1.7l5 5a1.2 1.2 0 0 0 1.7 0l10.1-10a1.2 1.2 0 1 0-1.7-1.8l-9.2 9.3z"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="M15.6 4.4a1.3 1.3 0 0 1 0 1.8L9.8 12l5.8 5.8a1.3 1.3 0 1 1-1.8 1.8l-6.7-6.7a1.3 1.3 0 0 1 0-1.8l6.7-6.7a1.3 1.3 0 0 1 1.8 0z"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="M8.4 4.4a1.3 1.3 0 0 0 0 1.8l5.8 5.8-5.8 5.8a1.3 1.3 0 1 0 1.8 1.8l6.7-6.7a1.3 1.3 0 0 0 0-1.8l-6.7-6.7a1.3 1.3 0 0 0-1.8 0z"/></symbol>
     <symbol id="i-diamond" viewBox="0 0 24 24"><path d="M12 2.5 21.5 12 12 21.5 2.5 12z"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.3 4.6 12 10.3l5.7-5.7a1.2 1.2 0 1 1 1.7 1.7L13.7 12l5.7 5.7a1.2 1.2 0 1 1-1.7 1.7L12 13.7l-5.7 5.7a1.2 1.2 0 1 1-1.7-1.7l5.7-5.7-5.7-5.7a1.2 1.2 0 0 1 1.7-1.7z"/></symbol>
     <symbol id="i-retry" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2z"/></symbol>
@@ -297,6 +310,11 @@
           <p class="tagline">Spring im Takt, flieg durch Tunnel, dreh die Schwerkraft um.</p>
         </div>
         <div class="menu-actions">
+          <div class="pager">
+            <button class="icon-btn" id="pgPrev" aria-label="Vorherige Seite"><svg class="i"><use href="#i-left"/></svg></button>
+            <div class="page-label" id="pgLabel"><b>1–3</b>von 15</div>
+            <button class="icon-btn" id="pgNext" aria-label="Nächste Seite"><svg class="i"><use href="#i-right"/></svg></button>
+          </div>
           <button class="icon-btn" id="soundBtn" aria-label="Ton an/aus"><svg class="i"><use href="#i-sound"/></svg></button>
         </div>
       </div>

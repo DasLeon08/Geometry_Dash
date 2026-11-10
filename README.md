@@ -8,7 +8,11 @@ Rakete durch Tunnel und drehst die Schwerkraft um.
 
 ## Features
 
-- 3 Level: *Erster Sprung* (leicht), *Neon-Himmel* (mittel), *Umkehr* (schwer)
+- 15 Level in vier Stufen:
+  - Leicht: *Erster Sprung*, *Sonnenpfad*, *Kristallhöhle*, *Erster Flug*
+  - Mittel: *Neon-Himmel*, *Tiefsee*, *Vulkan*, *Polarlicht*, *Turbo-Tunnel*
+  - Schwer: *Umkehr*, *Schattenwerk*, *Sternenstaub*, *Glitch*
+  - Extrem: *Nachtschicht*, *Neon-Kern*
 - Würfel- und Raketen-Modus, Sprungfelder, gelbe/blaue Ringe, Schwerkraft-Portale
 - 3 Münzen pro Level, Bestwerte in % (Normal und Übung)
 - Übungsmodus mit automatischen und manuellen Checkpoints
@@ -61,9 +65,11 @@ Das Spiel funktioniert auch in einem `<iframe>`:
 
 ## Level bearbeiten
 
-Die Level stehen in [`js/levels.js`](js/levels.js) als Text-Karten
+Die Level stehen in [`js/levels.js`](js/levels.js), entweder als Text-Karten
 (`#` Block, `^` Stachel, `o` Ring, `S` Raketen-Portal …, die Legende steht oben
-in der Datei). Nach jeder Änderung prüfen, ob das Level noch schaffbar ist:
+in der Datei) oder zusammengesetzt aus Bausteinen wie `pillars`, `stairs`,
+`padTower`, `orbChain`, `ship`, `grav` und `blue`. Die Reihenfolge im Menü
+legt die Liste `ORDER` am Ende der Datei fest. Nach jeder Änderung prüfen, ob das Level noch schaffbar ist:
 
 ```bash
 node tools/verify-levels.js

@@ -139,6 +139,8 @@
         if (e.code === 'KeyZ') placeCheckpoint(true);
         if (e.code === 'KeyX') removeCheckpoint();
       }
+    } else if (game.scene === 'menu' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
+      turnPage(e.code === 'ArrowLeft' ? -1 : 1);
     } else if (game.scene === 'win' && (e.code === 'Space' || e.code === 'Enter')) {
       e.preventDefault();
       document.getElementById('againBtn').click();
@@ -168,7 +170,9 @@
   const $ = (id) => document.getElementById(id);
   function show(id, on) { $(id).classList.toggle('hidden', !on); }
 
-  const DIFF_NAMES = ['', 'Leicht', 'Mittel', 'Schwer'];
+  const DIFF_NAMES = ['', 'Leicht', 'Mittel', 'Schwer', 'Extrem'];
+  const PER_PAGE = 3;
+  let menuPage = null;   // null = Seite mit dem ersten ungeschafften Level
   const icon = (name) => '<svg class="i"><use href="#i-' + name + '"/></svg>';
 
   /** Farben des Levels für Menüs und Anzeige übernehmen. */
@@ -239,11 +243,39 @@
     c.fillStyle = shade; c.fillRect(0, 0, w, h);
   }
 
+  function pageCount() { return Math.ceil(window.LEVELS.length / PER_PAGE); }
+
+  function turnPage(dir) {
+    const next = Math.max(0, Math.min(pageCount() - 1, menuPage + dir));
+    if (next === menuPage) return;
+    menuPage = next;
+    A.sfx('click');
+    buildMenu();
+    const wrap = $('levels');
+    wrap.style.setProperty('--dir', (dir > 0 ? 24 : -24) + 'px');
+    wrap.classList.remove('turn');
+    void wrap.offsetWidth;
+    wrap.classList.add('turn');
+  }
+  $('pgPrev').onclick = () => turnPage(-1);
+  $('pgNext').onclick = () => turnPage(1);
+
   function buildMenu() {
     const wrap = $('levels');
     wrap.innerHTML = '';
     const arts = [];
+    if (menuPage === null) {
+      let first = window.LEVELS.findIndex((d) => !levelSave(d.id).done);
+      if (first < 0) first = 0;
+      menuPage = Math.floor(first / PER_PAGE);
+    }
+    const from = menuPage * PER_PAGE;
+    const to = Math.min(window.LEVELS.length, from + PER_PAGE);
+    $('pgLabel').innerHTML = '<b>' + (from + 1) + '–' + to + '</b>von ' + window.LEVELS.length;
+    $('pgPrev').disabled = menuPage === 0;
+    $('pgNext').disabled = menuPage >= pageCount() - 1;
     window.LEVELS.forEach((def, i) => {
+      if (i < from || i >= to) return;
       const lvl = E.parseLevel(def);
       const sv = levelSave(def.id);
       const card = document.createElement('div');
@@ -311,6 +343,7 @@
   function blurActive() { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
 
   function goMenu() {
+    if (game.level) menuPage = Math.floor(game.levelIndex / PER_PAGE);
     game.scene = 'menu';
     game.paused = false;
     A.stopMusic(true);
