@@ -955,6 +955,7 @@
     if (game.practice) sv.practice = Math.max(sv.practice, pct);
     else sv.best = Math.max(sv.best, pct);
     writeSave();
+    if (!game.practice) window.toki?.score(pct);
   }
 
   function onWin() {
@@ -978,6 +979,7 @@
       });
     }
     writeSave();
+    if (!game.practice) window.toki?.score(100);
     for (let i = 0; i < 6; i++) {
       setTimeout(() => burst(s.x - 2 + Math.random() * 4, 3 + Math.random() * 5,
         ['#ffd84a', '#5ee6ff', '#ff5ec8'], 24, 7), i * 160);
