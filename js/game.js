@@ -20,13 +20,33 @@
   // Speicherstand (nur im Browser des Spielers)
   // ---------------------------------------------------------------------
   const save = loadSave();
+  // Ganzzahl zwischen 0 und max, alles andere wird 0.
+  function clampInt(v, max) {
+    v = Number(v);
+    return isFinite(v) ? Math.max(0, Math.min(max, Math.floor(v))) : 0;
+  }
+  // Der Spielstand kann von aussen kommen (z.B. von Toki zurückgespielt),
+  // darum nur bekannte Felder mit geprüften Werten übernehmen.
   function loadSave() {
-    let data = null;
-    try { data = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { data = null; }
-    data = data && typeof data === 'object' ? data : {};
-    data.levels = data.levels || {};
-    if (typeof data.color !== 'number') data.color = 0;
-    data.muted = !!data.muted;
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { raw = null; }
+    const data = { levels: {}, color: 0, muted: false };
+    if (!raw || typeof raw !== 'object') return data;
+    data.color = clampInt(raw.color, PLAYER_COLORS.length - 1);
+    data.muted = raw.muted === true;
+    const levels = raw.levels && typeof raw.levels === 'object' ? raw.levels : {};
+    window.LEVELS.forEach((def) => {
+      const l = levels[def.id];
+      if (!l || typeof l !== 'object') return;
+      const coins = Array.isArray(l.coins) ? l.coins.map((c) => clampInt(c, 99)) : [];
+      data.levels[def.id] = {
+        best: clampInt(l.best, 100),
+        practice: clampInt(l.practice, 100),
+        attempts: clampInt(l.attempts, 1e9),
+        coins: coins.filter((c, i) => coins.indexOf(c) === i),
+        done: l.done === true,
+      };
+    });
     return data;
   }
   function writeSave() {
