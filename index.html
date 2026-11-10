@@ -235,6 +235,76 @@
     .pill-btn.del svg.i { color: #e03a5f; }
     .pill-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--ink); }
 
+    /* ---------- Mehrspieler ---------- */
+    .mp-open {
+      display: inline-flex; align-items: center; gap: 8px; height: 50px; padding: 0 18px; border-radius: 999px;
+      font-size: 16px; font-weight: 700; color: #fff; background: var(--rose); border: 4px solid var(--ink);
+      box-shadow: 0 5px 0 var(--ink); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+      transition: transform .08s, box-shadow .08s, filter .15s;
+    }
+    .mp-open svg.i { width: 22px; height: 22px; filter: drop-shadow(0 2px 0 rgba(0,0,0,.3)); }
+    .mp-open:hover { filter: brightness(1.06); }
+    .mp-open:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--ink); }
+    #mp .panel { width: min(460px, 100%); }
+    .field { display: flex; flex-direction: column; gap: 6px; text-align: left; margin: 14px 0; }
+    .field label { font-size: 13px; font-weight: 700; color: var(--sub); }
+    .input {
+      width: 100%; height: 50px; padding: 0 14px; border-radius: 16px; border: 4px solid var(--ink); background: #fff;
+      font: inherit; font-size: 18px; font-weight: 600; color: var(--ink); outline: none;
+    }
+    .input:focus { border-color: var(--ink); box-shadow: 0 0 0 4px var(--sun); }
+    .input.code { text-transform: uppercase; letter-spacing: .3em; font-weight: 700; text-align: center; }
+    .row { display: flex; gap: 10px; align-items: stretch; }
+    .row .btn-go { width: auto; padding: 0 18px; flex: none; }
+    .btn-go.secondary { background: linear-gradient(180deg, #8fe3ff, var(--sky)); }
+    .btn-go:disabled { filter: grayscale(.7) brightness(.9); cursor: default; transform: none; }
+    .or { margin: 4px 0; font-size: 13px; font-weight: 700; color: var(--sub); }
+    .status { min-height: 20px; margin-top: 10px; font-size: 14px; font-weight: 600; color: var(--sub); }
+    .status.error { color: #d6264e; }
+    .room-code {
+      display: flex; align-items: center; justify-content: center; gap: 10px; margin: 10px 0 4px;
+      font-size: 42px; font-weight: 700; letter-spacing: .18em; color: var(--ink);
+    }
+    .copy-btn { width: 44px; height: 44px; }
+    .room-hint { font-size: 13px; color: var(--sub); margin-bottom: 12px; }
+    .players { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 12px; }
+    .player {
+      display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 14px; background: #fff;
+      border: 3px solid var(--ink); font-weight: 700; color: var(--ink); text-align: left; min-width: 0;
+    }
+    .player .sw { width: 22px; height: 22px; border-radius: 6px; border: 3px solid var(--ink); flex: none; }
+    .player .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .player .tag { font-size: 11px; padding: 0 6px; border-radius: 6px; background: var(--sun); border: 2px solid var(--ink); flex: none; }
+    .player.empty { background: transparent; border-style: dashed; border-color: #c9bda8; color: #b3a78f; font-weight: 600; justify-content: center; }
+    .setting { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0; text-align: left; }
+    .setting > span { font-size: 13px; font-weight: 700; color: var(--sub); }
+    .picker { display: flex; align-items: center; gap: 8px; }
+    .picker .icon-btn { width: 40px; height: 40px; }
+    .picker .icon-btn svg.i { width: 18px; height: 18px; }
+    .picker b { min-width: 150px; text-align: center; color: var(--ink); font-size: 16px; }
+    .seg { display: flex; border: 3px solid var(--ink); border-radius: 12px; overflow: hidden; }
+    .seg button { padding: 6px 10px; font-size: 13px; font-weight: 700; color: var(--ink); background: #fff; }
+    .seg button + button { border-left: 3px solid var(--ink); }
+    .seg button.on { background: var(--sun); }
+    .seg button:disabled { cursor: default; }
+    .results { margin: 6px 0 12px; display: flex; flex-direction: column; gap: 6px; }
+    .result {
+      display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 14px; background: #fff;
+      border: 3px solid var(--ink); font-weight: 700; color: var(--ink);
+    }
+    .result .place { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid var(--ink); background: var(--sand); font-size: 14px; flex: none; }
+    .result:nth-child(1) .place { background: var(--gold); }
+    .result .nm { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .result .tm { font-size: 14px; }
+    .toast {
+      position: fixed; left: 50%; top: 16px; transform: translateX(-50%); z-index: 60; padding: 10px 18px; border-radius: 16px;
+      background: var(--cream); color: var(--ink); border: 4px solid var(--ink); box-shadow: 0 5px 0 var(--ink); font-weight: 700;
+      transition: opacity .3s;
+    }
+    #mp .tile { min-height: 50px; flex-direction: row; gap: 8px; }
+    #mp .tile svg.i { width: 22px; height: 22px; }
+    .finish-bar { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; gap: 10px; }
+
     /* ---------- Hochformat-Hinweis ---------- */
     #rotate { z-index: 50; background: #2b0f6b; flex-direction: column; text-align: center; gap: 12px; font-size: 20px; font-weight: 600; }
     #rotate .phone { font-size: 56px; animation: tilt 1.6s ease-in-out infinite; }
@@ -271,6 +341,24 @@
       .coin.got::after { inset: 7px; }
       .stats { margin-bottom: 12px; }
       .hint { display: none; }
+      .mp-open { height: 42px; padding: 0 12px; font-size: 14px; }
+      .room-code { font-size: 26px; margin: 2px 0 0; }
+      .room-code .copy-btn { width: 36px; height: 36px; }
+      .room-hint { display: none; }
+      .players { grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0; }
+      .player { padding: 3px 6px; font-size: 13px; gap: 5px; }
+      .player .sw { width: 16px; height: 16px; border-width: 2px; }
+      .player .tag { display: none; }
+      .setting { margin: 4px 0; }
+      .picker .icon-btn { width: 34px; height: 34px; }
+      .picker b { min-width: 120px; font-size: 14px; }
+      #mp .tile { min-height: 40px; margin-top: -4px; }
+      #mp .title { font-size: 22px; }
+      .status { margin-top: 4px; min-height: 16px; font-size: 12px; }
+      .results { margin: 4px 0; gap: 4px; }
+      .result { padding: 2px 10px; }
+      .field { margin: 8px 0; }
+      .input { height: 42px; }
     }
     @media (max-width: 600px) { .levels { --peek: 1.6; } }
   </style>
@@ -294,6 +382,8 @@
     <symbol id="i-retry" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2z"/></symbol>
     <symbol id="i-jump" viewBox="0 0 24 24"><path d="M12 3.5a1 1 0 0 1 .7.3l6 6a1 1 0 0 1-.7 1.7h-3.5V19a1.5 1.5 0 0 1-1.5 1.5h-2A1.5 1.5 0 0 1 9.5 19v-7.5H6a1 1 0 0 1-.7-1.7l6-6a1 1 0 0 1 .7-.3z"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2zm0 2a1.2 1.2 0 0 1 1.2 1.2v3.9l2.7 2.7a1.2 1.2 0 0 1-1.7 1.7l-3-3a1.2 1.2 0 0 1-.4-.9V7.6A1.2 1.2 0 0 1 12 6.4z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M9 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm8 1.5a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM9 13.5c3.6 0 7 1.8 7 4.5v1a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 2 19v-1c0-2.7 3.4-4.5 7-4.5zm8.6.6c2.6.3 4.4 1.7 4.4 3.6v1.1a1.2 1.2 0 0 1-1.2 1.2h-2.6c.5-.4.8-1 .8-1.6V18c0-1.5-.6-2.8-1.4-3.9z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><path d="M9 3h9a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-1v-2.4h1a.6.6 0 0 0 .6-.6V6a.6.6 0 0 0-.6-.6H9a.6.6 0 0 0-.6.6v1H6V6a3 3 0 0 1 3-3zM6 8h9a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-7a3 3 0 0 1 3-3z"/></symbol>
     <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 3h10a1 1 0 0 1 1 1v1h2.5a1 1 0 0 1 1 1v1.5a4.5 4.5 0 0 1-4.3 4.5A6 6 0 0 1 13.2 15v2.6h2.6a1.2 1.2 0 1 1 0 2.4H8.2a1.2 1.2 0 1 1 0-2.4h2.6V15a6 6 0 0 1-4-3A4.5 4.5 0 0 1 2.5 7.5V6a1 1 0 0 1 1-1H6V4a1 1 0 0 1 1-1zM4.7 7.2v.3a2.3 2.3 0 0 0 1.4 2.1A6 6 0 0 1 6 8.5V7.2H4.7zm14.6 0H18v1.3l-.1 1.1a2.3 2.3 0 0 0 1.4-2.1v-.3z"/></symbol>
   </svg>
 
@@ -308,6 +398,7 @@
           <p class="tagline">Spring im Takt, flieg durch Tunnel, dreh die Schwerkraft um.</p>
         </div>
         <div class="menu-actions">
+          <button class="mp-open" id="mpBtn"><svg class="i"><use href="#i-users"/></svg>Mehrspieler</button>
           <div class="pager">
             <button class="icon-btn" id="pgPrev" aria-label="Vorherige Seite"><svg class="i"><use href="#i-left"/></svg></button>
             <div class="page-label" id="pgLabel"><b>1–3</b>von 15</div>
@@ -336,6 +427,66 @@
     <button class="pill-btn" id="cpAdd"><svg class="i"><use href="#i-diamond"/></svg>Checkpoint</button>
     <button class="pill-btn del" id="cpDel"><svg class="i"><use href="#i-x"/></svg>Löschen</button>
   </div>
+
+  <!-- Mehrspieler -->
+  <div id="mp" class="overlay dim hidden">
+    <div class="panel">
+      <!-- Schritt 1: Raum erstellen oder beitreten -->
+      <div id="mpStart">
+        <div class="eyebrow">Mehrspieler</div>
+        <div class="title">Rennen mit Freunden</div>
+        <div class="field">
+          <label for="mpName">Dein Name</label>
+          <input class="input" id="mpName" maxlength="12" autocomplete="off" spellcheck="false">
+        </div>
+        <button class="btn-go" id="mpCreate"><svg class="i"><use href="#i-users"/></svg>Raum erstellen</button>
+        <div class="or">oder mit Code beitreten</div>
+        <div class="row">
+          <input class="input code" id="mpCode" maxlength="5" placeholder="CODE" autocomplete="off" spellcheck="false">
+          <button class="btn-go secondary" id="mpJoin">Beitreten</button>
+        </div>
+        <div class="status" id="mpStatus"></div>
+        <div class="tiles" style="grid-template-columns: 1fr">
+          <button class="tile" id="mpBack"><svg class="i"><use href="#i-home"/></svg>Zurück</button>
+        </div>
+      </div>
+      <!-- Schritt 2: Lobby -->
+      <div id="mpLobby" class="hidden">
+        <div class="eyebrow">Raum</div>
+        <div class="room-code"><span id="mpRoomCode">-----</span>
+          <button class="icon-btn copy-btn" id="mpCopy" aria-label="Code kopieren" title="Code kopieren"><svg class="i"><use href="#i-copy"/></svg></button>
+        </div>
+        <div class="room-hint">Lade Freunde über Toki ein oder gib ihnen den Code.</div>
+        <div class="results hidden" id="mpResults"></div>
+        <div class="players" id="mpPlayers"></div>
+        <div class="setting">
+          <span>Level</span>
+          <div class="picker">
+            <button class="icon-btn" id="mpLvlPrev" aria-label="Vorheriges Level"><svg class="i"><use href="#i-left"/></svg></button>
+            <b id="mpLevel">Level 1</b>
+            <button class="icon-btn" id="mpLvlNext" aria-label="Nächstes Level"><svg class="i"><use href="#i-right"/></svg></button>
+          </div>
+        </div>
+        <div class="setting">
+          <span>Wenn jemand im Ziel ist</span>
+          <div class="seg">
+            <button id="mpModeGo" class="on">Alle spielen weiter</button>
+            <button id="mpModeEnd">Rennen endet</button>
+          </div>
+        </div>
+        <button class="btn-go" id="mpStart2"><svg class="i"><use href="#i-play"/></svg>Rennen starten</button>
+        <div class="status" id="mpLobbyStatus"></div>
+        <div class="tiles" style="grid-template-columns: 1fr">
+          <button class="tile" id="mpLeave"><svg class="i"><use href="#i-home"/></svg>Raum verlassen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="finishBar" class="finish-bar hidden">
+    <button class="pill-btn" id="mpAgain"><svg class="i"><use href="#i-restart"/></svg>Weiterspielen</button>
+    <button class="pill-btn" id="mpToLobby"><svg class="i"><use href="#i-users"/></svg>Zur Lobby</button>
+  </div>
+  <div id="toast" class="toast hidden"></div>
 
   <!-- Pause -->
   <div id="pause" class="overlay dim hidden">
@@ -389,6 +540,7 @@
   <script src="js/engine.js"></script>
   <script src="js/levels.js"></script>
   <script src="js/audio.js"></script>
+  <script src="js/multiplayer.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

@@ -20,6 +20,7 @@ Rakete durch Tunnel und drehst die Schwerkraft um.
   Intro, Drop, Break und zweitem Drop, Stereo-Echo, Hall und „pumpendem“ Bass;
   schwerere Level klingen energiegeladener, dazu eine ruhige Menü-Musik
 - Scroll-Menü: Level per Wischen, Mausrad, Ziehen oder Pfeiltasten durchblättern
+- Mehrspieler-Rennen für bis zu 4 Spieler mit Raumcode (siehe unten)
 - 6 Farben für den Würfel
 - Läuft auf PC (Tastatur/Maus) und Handy/Tablet (Touch, Querformat)
 - Fortschritt wird lokal im Browser gespeichert (`localStorage`)
@@ -77,6 +78,38 @@ Das Spiel funktioniert auch in einem `<iframe>`:
 ```html
 <iframe src="/games/neon-hop/index.html" allow="autoplay; fullscreen" style="border:0;width:100%;aspect-ratio:16/9"></iframe>
 ```
+
+## Mehrspieler
+
+Im Menü auf **Mehrspieler** tippen, Namen eingeben und einen Raum erstellen. Der
+5-stellige Code wird an Toki gemeldet (`toki.room(code)`, beim Verlassen
+`toki.room(null)`), damit man Freunde über Toki einladen kann. Mitspieler treten
+mit dem Code bei, oder über einen Link mit `?room=CODE` (bzw. `#room=CODE`).
+Von aussen geht auch `NeonHop.joinRoom('CODE')`.
+
+- Bis zu 4 Spieler. Der Host wählt das Level und startet. Es gibt einen Countdown 3-2-1-LOS.
+- Alle spielen dasselbe Level gleichzeitig. Die anderen sieht man als halb
+  durchsichtige Geister mit Namen, man kann sich also nicht stören. Auf dem
+  Fortschrittsbalken sind sie als farbige Punkte zu sehen.
+- Wer stirbt, startet das Level neu. Die Zeit läuft ab „LOS“.
+- Einstellung „Wenn jemand im Ziel ist“:
+  - **Alle spielen weiter** (Standard): Wer im Ziel ist, bekommt seinen Platz und kann
+    weiterspielen oder in die Lobby gehen. Für die anderen läuft das Rennen weiter.
+  - **Rennen endet**: Beim ersten Zieleinlauf geht es für alle mit der Rangliste in die Lobby.
+
+Technik: Die Spieler verbinden sich direkt (WebRTC, Bibliothek PeerJS in
+`js/vendor/`, MIT-Lizenz, wird erst beim Öffnen des Mehrspieler-Fensters geladen).
+Für den Verbindungsaufbau wird standardmässig der kostenlose öffentliche
+PeerJS-Server benutzt. Einen eigenen Server ([PeerServer](https://github.com/peers/peerjs-server))
+stellt man vor `js/multiplayer.js` ein:
+
+```html
+<script>window.NEONHOP_PEER = { host: 'peer.example.com', port: 443, path: '/', secure: true };</script>
+```
+
+In manchen Netzen (z.B. strenge Firmen- oder Schulnetze) klappt eine direkte
+Verbindung nicht. Dann bräuchte es zusätzlich einen TURN-Server, der sich über
+`config: { iceServers: [...] }` in `NEONHOP_PEER` eintragen lässt.
 
 ## Level bearbeiten
 

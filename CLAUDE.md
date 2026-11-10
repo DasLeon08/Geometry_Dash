@@ -16,3 +16,8 @@
   Zeitschritt `C.DT = 1/240`.
 - Nach jeder Änderung an Physik oder Leveln: `node tools/verify-levels.js`
   (muss für alle Level „OK“ und alle Münzen erreichbar melden).
+- Mehrspieler: `js/multiplayer.js` (Verbindung, PeerJS/WebRTC, Host-Stern), Lobby und Rennen
+  in `js/game.js` (Abschnitt „Mehrspieler“). Nachrichten von Mitspielern sind nicht
+  vertrauenswürdig: immer prüfen und nur per `textContent` anzeigen. Raumcode an Toki über
+  `window.toki.room(code)`. Testen geht lokal mit dem npm-Paket `peer` als
+  Vermittlungs-Server und `window.NEONHOP_PEER = { host: '127.0.0.1', port: 9000, path: '/', secure: false }`.

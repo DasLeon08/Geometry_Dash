@@ -36,10 +36,11 @@
   function loadSave() {
     let raw = null;
     try { raw = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { raw = null; }
-    const data = { levels: {}, color: 0, muted: false };
+    const data = { levels: {}, color: 0, muted: false, name: '' };
     if (!raw || typeof raw !== 'object') return data;
     data.color = clampInt(raw.color, PLAYER_COLORS.length - 1);
     data.muted = raw.muted === true;
+    data.name = typeof raw.name === 'string' ? raw.name.replace(/[\u0000-\u001f<>]/g, '').slice(0, 12) : '';
     const levels = raw.levels && typeof raw.levels === 'object' ? raw.levels : {};
     window.LEVELS.forEach((def) => {
       const l = levels[def.id];
@@ -132,6 +133,10 @@
 
   window.addEventListener('keydown', (e) => {
     A.unlock();
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+      if (e.code === 'Enter' && e.target.id === 'mpCode') $('mpJoin').click();
+      return;
+    }
     if (game.scene === 'play') {
       if (JUMP_KEYS.has(e.code)) {
         e.preventDefault();
@@ -445,6 +450,8 @@
       show('pausePractice', game.practice);
       $('togglePracticeBtn').querySelector('span').textContent = game.practice ? 'Normal spielen' : 'Übungsmodus';
       $('togglePracticeBtn').classList.toggle('on', game.practice);
+      show('togglePracticeBtn', !game.race);
+      $('menuBtn').lastChild.textContent = game.race ? 'Lobby' : 'Menü';
       A.pauseAll();
     } else {
       // genau dort weitermachen, wo pausiert wurde (Spiel und Musik)
@@ -457,7 +464,7 @@
   $('resumeBtn').onclick = () => togglePause();
   $('restartBtn').onclick = () => { game.paused = false; show('pause', false); blurActive(); restartLevel(); };
   $('togglePracticeBtn').onclick = () => { show('pause', false); blurActive(); startLevel(game.levelIndex, !game.practice); };
-  $('menuBtn').onclick = goMenu;
+  $('menuBtn').onclick = () => { if (game.race) toLobby(); else goMenu(); };
   $('winMenuBtn').onclick = goMenu;
   $('againBtn').onclick = () => { blurActive(); startLevel(game.levelIndex, game.practice); };
   $('nextBtn').onclick = () => { blurActive(); startLevel((game.levelIndex + 1) % window.LEVELS.length, false); };
@@ -465,11 +472,414 @@
   $('cpDel').addEventListener('pointerdown', (e) => { e.stopPropagation(); removeCheckpoint(); });
 
   // ---------------------------------------------------------------------
+  // Mehrspieler: Rennen im selben Level, die anderen sieht man als Geister.
+  // Der Host verwaltet Spielerliste, Level und Ergebnisse; alle Nachrichten
+  // von anderen werden geprüft, bevor sie benutzt werden.
+  // ---------------------------------------------------------------------
+  const N = window.Net;
+  const COUNTDOWN = 3;
+  const MAX_PLAYERS = 4;
+  const mp = {
+    inRoom: false, host: false, code: null, me: null,
+    players: [],            // [{ id, name, color }], Host zuerst
+    level: 0, mode: 'go',   // 'go' = alle spielen weiter, 'end' = Rennen endet beim Ersten
+    racing: false, raceId: 0, raceStart: 0, finishedMs: null,
+    results: [], remote: {}, lastSend: 0, busy: false,
+  };
+
+  function cleanName(n) {
+    return String(n || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 12) || 'Spieler';
+  }
+  function num(v, lo, hi) {
+    v = Number(v);
+    return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : null;
+  }
+  function toast(text) {
+    const t = $('toast');
+    t.textContent = text;
+    show('toast', true);
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => show('toast', false), 3200);
+  }
+  /** Raumcode an Toki melden, damit man Freunde einladen kann. */
+  function tokiRoom(code) {
+    try { if (window.toki && typeof window.toki.room === 'function') window.toki.room(code); } catch (e) { /* egal */ }
+  }
+  function mpStatus(text, error, el) {
+    const box = $(el || 'mpStatus');
+    box.textContent = text || '';
+    box.classList.toggle('error', !!error);
+  }
+  function rememberName() {
+    save.name = cleanName($('mpName').value);
+    $('mpName').value = save.name;
+    writeSave();
+  }
+  function setBusy(on) {
+    mp.busy = on;
+    ['mpCreate', 'mpJoin'].forEach((id) => { $(id).disabled = on; });
+  }
+
+  // ----- Fenster ---------------------------------------------------------
+  function openMp() {
+    A.unlock();
+    if (!$('mpName').value) $('mpName').value = save.name || ('Spieler ' + (10 + Math.floor(Math.random() * 90)));
+    if (!mp.inRoom) mpStatus('');
+    renderLobby();
+    show('mp', true);
+  }
+  function renderLobby() {
+    show('mpStart', !mp.inRoom);
+    show('mpLobby', mp.inRoom);
+    if (!mp.inRoom) return;
+    $('mpRoomCode').textContent = mp.code;
+    const wrap = $('mpPlayers');
+    wrap.textContent = '';
+    for (let i = 0; i < MAX_PLAYERS; i++) {
+      const p = mp.players[i];
+      const el = document.createElement('div');
+      if (!p) {
+        el.className = 'player empty';
+        el.textContent = 'frei';
+      } else {
+        el.className = 'player';
+        const sw = document.createElement('span');
+        sw.className = 'sw';
+        sw.style.background = PLAYER_COLORS[p.color][1];
+        sw.style.boxShadow = 'inset 0 0 0 4px ' + PLAYER_COLORS[p.color][0];
+        const nm = document.createElement('span');
+        nm.className = 'nm';
+        nm.textContent = p.name + (p.id === mp.me ? ' (du)' : '');
+        el.append(sw, nm);
+        if (i === 0) {
+          const tag = document.createElement('span');
+          tag.className = 'tag';
+          tag.textContent = 'Host';
+          el.appendChild(tag);
+        }
+      }
+      wrap.appendChild(el);
+    }
+    const def = window.LEVELS[mp.level];
+    $('mpLevel').textContent = (mp.level + 1) + '. ' + def.name;
+    ['mpLvlPrev', 'mpLvlNext', 'mpModeGo', 'mpModeEnd'].forEach((id) => { $(id).disabled = !mp.host; });
+    $('mpModeGo').classList.toggle('on', mp.mode === 'go');
+    $('mpModeEnd').classList.toggle('on', mp.mode === 'end');
+    show('mpStart2', mp.host);
+    if (!mp.host) mpStatus('Warte, bis der Host das Rennen startet …', false, 'mpLobbyStatus');
+    else mpStatus(mp.players.length < 2 ? 'Warte auf Freunde – oder starte schon allein.' : '', false, 'mpLobbyStatus');
+    renderResults();
+  }
+  function renderResults() {
+    const box = $('mpResults');
+    box.textContent = '';
+    show('mpResults', mp.results.length > 0);
+    mp.results.forEach((r, i) => {
+      const row = document.createElement('div');
+      row.className = 'result';
+      const pl = document.createElement('span'); pl.className = 'place'; pl.textContent = i + 1;
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name + (r.id === mp.me ? ' (du)' : '');
+      const tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = (r.ms / 1000).toFixed(1) + ' s';
+      row.append(pl, nm, tm);
+      box.appendChild(row);
+    });
+  }
+
+  // ----- Raum erstellen / beitreten / verlassen ---------------------------
+  async function mpCreate() {
+    if (mp.busy) return;
+    rememberName();
+    setBusy(true);
+    mpStatus('Raum wird erstellt …');
+    try {
+      const code = await N.host();
+      Object.assign(mp, {
+        inRoom: true, host: true, code, me: N.id, results: [], remote: {}, racing: false,
+        players: [{ id: N.id, name: save.name, color: save.color }],
+        level: game.level ? game.levelIndex : (focusLevel || 0),
+      });
+      tokiRoom(code);
+      mpStatus('');
+      renderLobby();
+    } catch (e) {
+      mpStatus(e.message, true);
+    }
+    setBusy(false);
+  }
+  async function mpJoinCode(raw) {
+    if (mp.busy) return;
+    openMp();
+    rememberName();
+    const code = N.cleanCode(raw);
+    $('mpCode').value = code;
+    if (code.length !== N.CODE_LEN) { mpStatus('Der Raumcode hat ' + N.CODE_LEN + ' Zeichen.', true); return; }
+    setBusy(true);
+    mpStatus('Verbinde mit Raum ' + code + ' …');
+    try {
+      await N.join(code);
+      Object.assign(mp, { inRoom: true, host: false, code, me: N.id, players: [], results: [], remote: {}, racing: false });
+      N.send({ t: 'hello', name: save.name, color: save.color });
+      tokiRoom(code);
+      mpStatus('');
+      renderLobby();
+    } catch (e) {
+      mpStatus(e.message, true);
+    }
+    setBusy(false);
+  }
+  function leaveRoom() {
+    const wasRacing = game.race;
+    N.leave();
+    tokiRoom(null);
+    Object.assign(mp, { inRoom: false, host: false, code: null, players: [], results: [], remote: {}, racing: false });
+    show('finishBar', false);
+    if (wasRacing || game.scene !== 'menu') goMenu();
+    renderLobby();
+  }
+
+  // ----- Nachrichten -------------------------------------------------------
+  function broadcastRoom() {
+    N.send({ t: 'room', players: mp.players, level: mp.level, mode: mp.mode });
+  }
+  /** Spielstand eines Mitspielers prüfen (kommt von aussen!). */
+  function readState(m) {
+    const x = num(m.x, 0, 100000), y = num(m.y, -2, 12), r = num(m.r, -1000, 1000);
+    if (x === null || y === null || r === null) return null;
+    return { x, y, r, m: m.m === 1 ? 1 : 0, g: m.g === -1 ? -1 : 1, d: m.d === 1 ? 1 : 0, w: m.w === 1 ? 1 : 0, race: num(m.race, 0, 1e9) };
+  }
+  function storeRemote(id, st) {
+    const old = mp.remote[id];
+    st.t = performance.now();
+    if (old) { st.sx = old.sx; st.sy = old.sy; }
+    mp.remote[id] = st;
+  }
+
+  N.on('guestLeft', (id) => {
+    const p = mp.players.find((q) => q.id === id);
+    mp.players = mp.players.filter((q) => q.id !== id);
+    delete mp.remote[id];
+    if (p) toast(p.name + ' hat den Raum verlassen.');
+    broadcastRoom();
+    renderLobby();
+  });
+  N.on('hostLeft', () => {
+    if (!mp.inRoom) return;
+    // Nie eine Spielerliste bekommen: wir wurden gar nicht aufgenommen (z.B. Raum voll)
+    const neverJoined = mp.players.length === 0;
+    leaveRoom();
+    openMp();
+    mpStatus(neverJoined ? 'Der Raum ist voll oder nicht mehr offen.' : 'Der Host hat den Raum verlassen.', true);
+  });
+  N.on('message', ({ from, msg }) => {
+    if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return;
+    if (mp.host) hostMessage(from, msg); else guestMessage(msg);
+  });
+
+  function hostMessage(from, m) {
+    if (m.t === 'hello') {
+      if (mp.players.some((p) => p.id === from)) return;
+      if (mp.players.length >= MAX_PLAYERS) { N.sendTo(from, { t: 'full' }); N.kick(from); return; }
+      const p = { id: from, name: cleanName(m.name), color: clampInt(m.color, PLAYER_COLORS.length - 1) };
+      mp.players.push(p);
+      toast(p.name + ' ist beigetreten!');
+      A.sfx('coin');
+      broadcastRoom();
+      N.sendTo(from, { t: 'results', race: mp.raceId, list: mp.results, end: false });
+      renderLobby();
+    } else if (m.t === 's') {
+      if (!mp.players.some((p) => p.id === from)) return;
+      const st = readState(m);
+      if (!st || st.race !== mp.raceId) return;
+      // an die anderen weitergeben (nur die geprüften Felder)
+      N.send({ t: 's', id: from, race: st.race, x: st.x, y: st.y, r: st.r, m: st.m, g: st.g, d: st.d, w: st.w }, from);
+      storeRemote(from, st);
+    } else if (m.t === 'fin') {
+      recordFinish(from, num(m.ms, 0, 36e5), num(m.race, 0, 1e9));
+    }
+  }
+
+  function guestMessage(m) {
+    if (m.t === 'full') {
+      leaveRoom();
+      openMp();
+      mpStatus('Der Raum ist voll (max. ' + MAX_PLAYERS + ' Spieler).', true);
+    } else if (m.t === 'room') {
+      if (!Array.isArray(m.players)) return;
+      mp.players = m.players.slice(0, MAX_PLAYERS)
+        .filter((p) => p && typeof p.id === 'string')
+        .map((p) => ({ id: p.id.slice(0, 80), name: cleanName(p.name), color: clampInt(p.color, PLAYER_COLORS.length - 1) }));
+      mp.level = clampInt(m.level, window.LEVELS.length - 1);
+      mp.mode = m.mode === 'end' ? 'end' : 'go';
+      renderLobby();
+    } else if (m.t === 'start') {
+      beginRace(clampInt(m.level, window.LEVELS.length - 1), m.mode, clampInt(m.race, 1e9));
+    } else if (m.t === 's') {
+      if (typeof m.id !== 'string' || m.id === mp.me) return;
+      const st = readState(m);
+      if (st && st.race === mp.raceId) storeRemote(m.id, st);
+    } else if (m.t === 'results') {
+      if (!Array.isArray(m.list)) return;
+      const list = m.list.slice(0, MAX_PLAYERS).filter((r) => r && typeof r.id === 'string')
+        .map((r) => ({ id: r.id.slice(0, 80), name: cleanName(r.name), ms: num(r.ms, 0, 36e5) || 0 }));
+      handleResults(list, m.end === true, clampInt(m.race, 1e9));
+    }
+  }
+
+  // ----- Rennen ------------------------------------------------------------
+  function hostStartRace() {
+    if (!mp.host) return;
+    mp.raceId++;
+    mp.results = [];
+    N.send({ t: 'start', level: mp.level, mode: mp.mode, race: mp.raceId });
+    beginRace(mp.level, mp.mode, mp.raceId);
+  }
+  function beginRace(level, mode, raceId) {
+    Object.assign(mp, { racing: true, raceId, level, mode: mode === 'end' ? 'end' : 'go', finishedMs: null, results: [], remote: {} });
+    show('mp', false); show('finishBar', false);
+    startLevel(level, false, true);
+  }
+  function mpSendState(now) {
+    if (!mp.racing || !game.state || now - mp.lastSend < 66) return;
+    mp.lastSend = now;
+    const s = game.state;
+    const msg = {
+      t: 's', race: mp.raceId, x: Math.round(s.x * 100) / 100, y: Math.round(s.y * 100) / 100,
+      r: Math.round(game.rot * 100) / 100, m: s.mode === 'ship' ? 1 : 0, g: s.gs, d: s.dead ? 1 : 0, w: s.won ? 1 : 0,
+    };
+    if (mp.host) msg.id = mp.me;
+    N.send(msg);
+  }
+  /** Eigener Zieleinlauf. */
+  function mpFinished() {
+    if (mp.finishedMs !== null || !mp.racing) return;
+    mp.finishedMs = Math.round(performance.now() - mp.raceStart);
+    if (mp.host) recordFinish(mp.me, mp.finishedMs, mp.raceId);
+    else N.send({ t: 'fin', ms: mp.finishedMs, race: mp.raceId });
+  }
+  /** Host: Zeit eintragen und an alle schicken. */
+  function recordFinish(id, ms, raceId) {
+    if (!mp.host || raceId !== mp.raceId || ms === null) return;
+    if (mp.results.some((r) => r.id === id)) return;
+    const p = mp.players.find((q) => q.id === id);
+    if (!p) return;
+    mp.results.push({ id, name: p.name, ms });
+    mp.results.sort((a, b) => a.ms - b.ms);
+    const end = mp.mode === 'end';
+    N.send({ t: 'results', race: mp.raceId, list: mp.results, end });
+    handleResults(mp.results, end, mp.raceId);
+  }
+  function handleResults(list, end, raceId) {
+    const newFinisher = list.length > mp.results.length ? list[list.length - 1] : null;
+    mp.results = list;
+    renderResults();
+    if (!mp.racing || raceId !== mp.raceId) return;
+    if (newFinisher && newFinisher.id !== mp.me) toast(newFinisher.name + ' ist im Ziel! (Platz ' + list.length + ')');
+    if (end && list.length) {
+      toast(list[0].name + (list[0].id === mp.me ? ' – du hast gewonnen!' : ' hat gewonnen!'));
+      setTimeout(() => { if (mp.racing && mp.raceId === raceId) toLobby(); }, 1600);
+    }
+  }
+  /** Nach dem eigenen Zieleinlauf (Modus "Alle spielen weiter"). */
+  function mpAfterFinish() {
+    if (!mp.racing) return;
+    if (mp.mode === 'end') { toLobby(); return; }
+    const place = mp.results.findIndex((r) => r.id === mp.me) + 1;
+    toast(place ? 'Platz ' + place + '! (' + (mp.finishedMs / 1000).toFixed(1) + ' s)' : 'Im Ziel!');
+    show('finishBar', true);
+  }
+  function toLobby() {
+    mp.racing = false;
+    game.race = false;
+    show('finishBar', false);
+    goMenu();
+    openMp();
+  }
+
+  // ----- Knöpfe ------------------------------------------------------------
+  $('mpBtn').onclick = () => { A.sfx('click'); openMp(); };
+  $('mpBack').onclick = () => show('mp', false);
+  $('mpCreate').onclick = mpCreate;
+  $('mpJoin').onclick = () => mpJoinCode($('mpCode').value);
+  $('mpCode').addEventListener('input', () => { $('mpCode').value = N.cleanCode($('mpCode').value); });
+  $('mpLeave').onclick = () => { leaveRoom(); show('mp', true); };
+  $('mpStart2').onclick = hostStartRace;
+  $('mpCopy').onclick = () => {
+    const text = mp.code || '';
+    const done = () => toast('Code ' + text + ' kopiert');
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => toast('Code: ' + text));
+    else toast('Code: ' + text);
+  };
+  $('mpLvlPrev').onclick = () => { if (!mp.host) return; mp.level = (mp.level + window.LEVELS.length - 1) % window.LEVELS.length; broadcastRoom(); renderLobby(); };
+  $('mpLvlNext').onclick = () => { if (!mp.host) return; mp.level = (mp.level + 1) % window.LEVELS.length; broadcastRoom(); renderLobby(); };
+  $('mpModeGo').onclick = () => { if (!mp.host) return; mp.mode = 'go'; broadcastRoom(); renderLobby(); };
+  $('mpModeEnd').onclick = () => { if (!mp.host) return; mp.mode = 'end'; broadcastRoom(); renderLobby(); };
+  $('mpAgain').addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    show('finishBar', false);
+    startLevel(mp.level, false, true, true);   // gleiches Rennen, ohne Countdown weiterspielen
+  });
+  $('mpToLobby').addEventListener('pointerdown', (e) => { e.stopPropagation(); toLobby(); });
+
+  // Einladungslink: ?room=CODE oder #room=CODE öffnet direkt den Raum
+  (function autoJoin() {
+    let code = null;
+    try {
+      code = new URLSearchParams(location.search).get('room') ||
+        new URLSearchParams(location.hash.replace(/^#/, '')).get('room');
+    } catch (e) { code = null; }
+    if (code) setTimeout(() => { openMp(); mpJoinCode(code); }, 300);
+  })();
+
+  // ----- Zeichnen ----------------------------------------------------------
+  function drawGhosts() {
+    if (!game.race) return;
+    const now = performance.now();
+    mp.players.forEach((p) => {
+      if (p.id === mp.me) return;
+      const r = mp.remote[p.id];
+      if (!r || now - r.t > 3000) return;
+      const age = Math.min(0.25, (now - r.t) / 1000);
+      const tx = r.x + (r.d || r.w ? 0 : C.SPEED * age);   // kurz vorausrechnen, damit es flüssig aussieht
+      if (r.sx === undefined || Math.abs(tx - r.sx) > 3) { r.sx = tx; r.sy = r.y; }   // Neustart: springen statt gleiten
+      r.sx += (tx - r.sx) * 0.35;
+      r.sy += (r.y - r.sy) * 0.35;
+      if (r.d) return;
+      const cols = PLAYER_COLORS[p.color];
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      drawAvatar(r.sx, r.sy, r.r, r.m ? 'ship' : 'cube', r.g, cols, false);
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = 0.95;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      outlinedText(p.name, wx(r.sx + 0.5), wy(r.sy + (r.g === -1 ? -0.5 : 1.55)), 15, cols[0], 4);
+      ctx.restore();
+    });
+  }
+  function drawCountdown() {
+    if (!game.race) return;
+    let text = null, k = 0;
+    if (game.countdown > 0) { text = String(Math.ceil(game.countdown)); k = game.countdown % 1; }
+    else if (game.goFlash > 0) { text = 'LOS!'; k = game.goFlash / 0.8; }
+    if (!text) return;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha = Math.min(1, 0.4 + k);
+    const size = 110 + (1 - k) * 0 + k * 30;
+    outlinedText(text, viewW / 2, viewH / 2 - 30, size, '#ffe066', 12);
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------------
   // Spielablauf
   // ---------------------------------------------------------------------
-  function startLevel(index, practice) {
+  function startLevel(index, practice, race, noCountdown) {
     A.unlock();
     A.stopMusic();
+    game.race = !!race;
+    game.countdown = race && !noCountdown ? COUNTDOWN : 0;
     game.levelIndex = index;
     game.level = E.parseLevel(window.LEVELS[index]);
     setTheme(game.level.def);
@@ -512,8 +922,8 @@
     game.state.prevHeld = held;      // gehaltene Taste nicht als neuen Klick zählen
     game.deathTimer = 0;
     game.lastAutoCp = game.state.time;
-    // Im Übungsmodus läuft die Musik beim Sterben einfach weiter
-    if (!game.practice || !A.isPlaying()) A.playMusic(game.level.def.music, game.level.def.difficulty);
+    // Im Übungsmodus läuft die Musik beim Sterben einfach weiter; beim Countdown startet sie erst bei "LOS"
+    if (game.countdown <= 0 && (!game.practice || !A.isPlaying())) A.playMusic(game.level.def.music, game.level.def.difficulty);
   }
 
   function progress() {
@@ -552,6 +962,7 @@
     A.stopMusic(true);
     A.sfx('win');
     game.scene = 'win';
+    game.winShown = false;
     game.winTimer = 1.3;
     game.flash = 1;
     const sv = levelSave(game.level.def.id);
@@ -594,7 +1005,7 @@
       const ev = s.events[i];
       if (ev === 'jump') game.jumps++;
       else if (ev === 'die') onDeath();
-      else if (ev === 'win') onWin();
+      else if (ev === 'win') { onWin(); if (game.race) mpFinished(); }
       else if (ev === 'orb' || ev === 'pad') { game.jumps++; A.sfx(ev); ring(s.x + 0.5, s.y + 0.5, ev === 'pad' ? '#ffd84a' : '#ffffff'); }
       else if (ev === 'portal') { A.sfx('portal'); game.flash = 0.35; }
       else if (ev === 'coin') { A.sfx('coin'); burst(s.x + 0.5, s.y + 0.5, ['#ffd84a', '#fff3b0'], 16, 5); }
@@ -872,17 +1283,20 @@
   function drawPlayer() {
     const s = game.state;
     if (s.dead) return;
-    const cols = PLAYER_COLORS[save.color];
-    const cx = wx(s.x + 0.5), cy = wy(s.y + 0.5);
+    drawAvatar(s.x, s.y, game.rot, s.mode, s.gs, PLAYER_COLORS[save.color], true);
+  }
+
+  function drawAvatar(x, y, rot, mode, gs, cols, glow) {
+    const cx = wx(x + 0.5), cy = wy(y + 0.5);
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.shadowColor = cols[0]; ctx.shadowBlur = 16;
-    if (s.mode === 'cube') {
-      ctx.rotate(game.rot);
+    if (glow) { ctx.shadowColor = cols[0]; ctx.shadowBlur = 16; }
+    if (mode === 'cube') {
+      ctx.rotate(rot);
       drawCubeShape(TS - 2, cols);
     } else {
-      ctx.rotate(game.rot);
-      if (s.gs === -1) ctx.scale(1, -1);
+      ctx.rotate(rot);
+      if (gs === -1) ctx.scale(1, -1);
       // kleiner Würfel als Pilot
       ctx.save(); ctx.translate(-2, -8); drawCubeShape(TS * 0.5, cols); ctx.restore();
       // Raketenkörper
@@ -989,6 +1403,16 @@
       ctx.beginPath(); ctx.moveTo(bx - 6, y - 9); ctx.lineTo(bx + 6, y - 9); ctx.lineTo(bx, y - 1); ctx.closePath();
       ctx.fill(); ctx.stroke();
     }
+    // Mitspieler als farbige Punkte unter dem Balken
+    if (game.race) {
+      mp.players.forEach((p) => {
+        const r = mp.remote[p.id];
+        if (p.id === mp.me || !r) return;
+        const mx = x + w * Math.min(1, Math.max(0, (r.sx !== undefined ? r.sx : r.x) / game.level.length));
+        ctx.fillStyle = PLAYER_COLORS[p.color][0]; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(mx, y + h + 9, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      });
+    }
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     outlinedText(pct + '%', x + w + 14, y + h / 2 + 1, 20, '#fff', 5);
@@ -1053,6 +1477,7 @@
     drawEnd(colors);
     drawCheckpoints();
     drawParticles();
+    drawGhosts();
     drawPlayer();
     ctx.restore();
 
@@ -1061,6 +1486,7 @@
       ctx.fillRect(0, 0, viewW, viewH);
     }
     drawHud();
+    drawCountdown();
   }
 
   // ---------------------------------------------------------------------
@@ -1072,7 +1498,18 @@
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     time += dt;
-    if (game.scene === 'play' && !game.paused) {
+    if (game.scene === 'play' && !game.paused && game.countdown > 0) {
+      const before = Math.ceil(game.countdown);
+      game.countdown -= dt;
+      if (game.countdown <= 0) {
+        game.countdown = 0;
+        game.goFlash = 0.8;
+        mp.raceStart = performance.now();
+        A.playMusic(game.level.def.music, game.level.def.difficulty);
+        A.sfx('portal');
+      } else if (Math.ceil(game.countdown) !== before) A.sfx('checkpoint');
+      acc = 0;
+    } else if (game.scene === 'play' && !game.paused) {
       acc += dt;
       while (acc >= C.DT) {
         simulate(C.DT);
@@ -1084,9 +1521,14 @@
     }
     if (game.scene === 'win') {
       game.winTimer -= dt;
-      if (game.winTimer <= 0 && $('win').classList.contains('hidden')) show('win', true);
+      if (game.winTimer <= 0 && $('win').classList.contains('hidden') && !game.winShown) {
+        game.winShown = true;
+        if (game.race) mpAfterFinish(); else show('win', true);
+      }
     }
     if (!game.paused) updateParticles(dt);
+    game.goFlash = Math.max(0, (game.goFlash || 0) - dt);
+    if (game.race) mpSendState(now);
     game.shake = Math.max(0, game.shake - dt);
     game.flash = Math.max(0, game.flash - dt * 2);
     render();
@@ -1098,5 +1540,5 @@
   requestAnimationFrame(frame);
 
   // für Tests / Einbettung
-  window.NeonHop = { game, startLevel, goMenu };
+  window.NeonHop = { game, startLevel, goMenu, mp, joinRoom: (code) => mpJoinCode(code) };
 })();
