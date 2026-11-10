@@ -156,10 +156,22 @@
     .pager .icon-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
     .page-label { min-width: 80px; text-align: center; font-size: 13px; font-weight: 600; color: #e3d9ff; }
     .page-label b { display: block; font-size: 19px; color: #fff; }
-    .levels.turn { animation: turn .22s ease; }
-    @keyframes turn { from { opacity: 0; transform: translateX(var(--dir, 20px)); } to { opacity: 1; transform: none; } }
-
-    .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    /* Scroll-Leiste mit allen Leveln (etwas mehr als 3 sichtbar, damit man sieht: hier geht's weiter) */
+    .levels {
+      --peek: 3.25;
+      display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 3 * 16px) / var(--peek)); gap: 16px;
+      overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+      padding: 8px 6px 20px; margin: -8px -6px 0; touch-action: pan-x; cursor: grab;
+      scrollbar-width: thin; scrollbar-color: var(--sun) rgba(0, 0, 0, 0.25);
+      -webkit-mask: linear-gradient(90deg, transparent 0, #000 8px, #000 calc(100% - 28px), transparent);
+      mask: linear-gradient(90deg, transparent 0, #000 8px, #000 calc(100% - 28px), transparent);
+    }
+    .levels.dragging { scroll-snap-type: none; cursor: grabbing; }
+    .levels.dragging .card { pointer-events: none; }
+    .levels::-webkit-scrollbar { height: 14px; }
+    .levels::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.25); border-radius: 8px; margin: 0 6px; }
+    .levels::-webkit-scrollbar-thumb { background: var(--sun); border: 3px solid var(--ink); border-radius: 8px; }
+    .card { scroll-snap-align: start; scroll-margin-left: 6px; }
     .card {
       --c: #7fd3ff; position: relative; display: flex; flex-direction: column; overflow: hidden; text-align: left;
       border-radius: 26px; background: var(--cream); color: var(--ink); border: 4px solid var(--ink); box-shadow: 0 8px 0 var(--ink);
@@ -230,7 +242,7 @@
     @media (orientation: portrait) and (max-width: 700px) { #rotate.show-if-portrait { display: flex !important; } }
 
     /* ---------- kleine / niedrige Bildschirme ---------- */
-    @media (max-width: 760px) { .levels { gap: 10px; } .card h3 { font-size: 18px; } }
+    @media (max-width: 760px) { .levels { gap: 10px; grid-auto-columns: calc((100% - 3 * 10px) / var(--peek)); } .card h3 { font-size: 18px; } }
     @media (max-height: 560px) {
       .overlay { padding: 10px; }
       .menu-top { margin-bottom: 10px; }
@@ -260,7 +272,7 @@
       .stats { margin-bottom: 12px; }
       .hint { display: none; }
     }
-    @media (max-height: 560px) and (max-width: 600px) { .levels { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) { .levels { --peek: 1.6; } }
   </style>
 </head>
 <body>

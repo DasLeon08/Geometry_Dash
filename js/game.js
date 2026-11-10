@@ -145,7 +145,8 @@
         if (e.code === 'KeyX') removeCheckpoint();
       }
     } else if (game.scene === 'menu' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
-      turnPage(e.code === 'ArrowLeft' ? -1 : 1);
+      e.preventDefault();   // sonst scrollt der Browser zusätzlich selbst und bremst die Animation
+      scrollCards(e.code === 'ArrowLeft' ? -1 : 1, false);
     } else if (game.scene === 'win' && (e.code === 'Space' || e.code === 'Enter')) {
       e.preventDefault();
       document.getElementById('againBtn').click();
@@ -155,6 +156,8 @@
   window.addEventListener('blur', () => { keysDown.clear(); pointers = 0; setHeld(); if (game.scene === 'play' && !game.paused) togglePause(); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && game.scene === 'play' && !game.paused) togglePause();
+    else if (document.hidden) A.pauseAll();
+    else if (game.scene !== 'play') A.resumeAll();
   });
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -176,8 +179,8 @@
   function show(id, on) { $(id).classList.toggle('hidden', !on); }
 
   const DIFF_NAMES = ['', 'Leicht', 'Mittel', 'Schwer', 'Extrem'];
-  const PER_PAGE = 3;
-  let menuPage = null;   // null = Seite mit dem ersten ungeschafften Level
+  let focusLevel = null;   // dieses Level beim Öffnen des Menüs zeigen
+  let menuBuilt = false;
   const icon = (name) => '<svg class="i"><use href="#i-' + name + '"/></svg>';
 
   /** Farben des Levels für Menüs und Anzeige übernehmen. */
@@ -248,39 +251,102 @@
     c.fillStyle = shade; c.fillRect(0, 0, w, h);
   }
 
-  function pageCount() { return Math.ceil(window.LEVELS.length / PER_PAGE); }
-
-  function turnPage(dir) {
-    const next = Math.max(0, Math.min(pageCount() - 1, menuPage + dir));
-    if (next === menuPage) return;
-    menuPage = next;
-    A.sfx('click');
-    buildMenu();
+  // ---------------------------------------------------------------------
+  // Scroll-Menü: Karten seitwärts scrollen (Wischen, Mausrad, Ziehen, Pfeile)
+  // ---------------------------------------------------------------------
+  function cardStep() {
     const wrap = $('levels');
-    wrap.style.setProperty('--dir', (dir > 0 ? 24 : -24) + 'px');
-    wrap.classList.remove('turn');
-    void wrap.offsetWidth;
-    wrap.classList.add('turn');
+    const c = wrap.querySelector('.card');
+    if (!c) return 1;
+    const gap = parseFloat(getComputedStyle(wrap).columnGap) || 16;
+    return c.getBoundingClientRect().width + gap;
   }
-  $('pgPrev').onclick = () => turnPage(-1);
-  $('pgNext').onclick = () => turnPage(1);
+  function visibleCards() { return Math.max(1, Math.floor(($('levels').clientWidth + 8) / cardStep())); }
+  function updatePager() {
+    const wrap = $('levels');
+    const n = window.LEVELS.length;
+    const first = Math.round(wrap.scrollLeft / cardStep());
+    const a = Math.min(n, first + 1), b = Math.min(n, first + visibleCards());
+    $('pgLabel').innerHTML = '<b>' + a + '–' + b + '</b>von ' + n;
+    $('pgPrev').disabled = wrap.scrollLeft <= 2;
+    $('pgNext').disabled = wrap.scrollLeft >= wrap.scrollWidth - wrap.clientWidth - 2;
+  }
+  let lastTarget = { i: 0, t: 0 };
+  function scrollCards(dir, page) {
+    const wrap = $('levels');
+    const step = cardStep();
+    const now = performance.now();
+    // Läuft noch eine Animation, vom Ziel aus weiterrechnen (schnelles Drücken)
+    const cur = now - lastTarget.t < 450 ? lastTarget.i : Math.round(wrap.scrollLeft / step);
+    const max = Math.ceil((wrap.scrollWidth - wrap.clientWidth) / step - 0.05);
+    const next = Math.max(0, Math.min(max, cur + dir * (page ? visibleCards() : 1)));
+    lastTarget = { i: next, t: now };
+    wrap.scrollTo({ left: next * step, behavior: 'smooth' });
+  }
+  function scrollToLevel(i) {
+    const wrap = $('levels');
+    wrap.scrollLeft = Math.max(0, i - 1) * cardStep();   // Level an zweiter Stelle zeigen
+    updatePager();
+  }
+  $('pgPrev').onclick = () => { A.sfx('click'); scrollCards(-1, true); };
+  $('pgNext').onclick = () => { A.sfx('click'); scrollCards(1, true); };
+
+  (function setupScroller() {
+    const wrap = $('levels');
+    wrap.addEventListener('scroll', () => requestAnimationFrame(updatePager), { passive: true });
+    window.addEventListener('resize', () => requestAnimationFrame(updatePager));
+    // Mausrad: eine Karte pro Raste seitwärts
+    let wheelAcc = 0, wheelLock = 0;
+    wrap.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;   // Trackpad seitwärts macht der Browser
+      e.preventDefault();
+      const now = performance.now();
+      wheelAcc += e.deltaY;
+      if (now < wheelLock || Math.abs(wheelAcc) < 30) return;
+      scrollCards(wheelAcc > 0 ? 1 : -1, false);
+      wheelAcc = 0;
+      wheelLock = now + 160;
+    }, { passive: false });
+    // Ziehen mit gedrückter Maustaste
+    let drag = null;
+    wrap.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      drag = { x: e.clientX, left: wrap.scrollLeft, moved: false, id: e.pointerId };
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      if (!drag.moved && Math.abs(dx) > 6) { drag.moved = true; wrap.classList.add('dragging'); }
+      if (drag.moved) wrap.scrollLeft = drag.left - dx;
+    });
+    window.addEventListener('pointerup', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const moved = drag.moved;
+      drag = null;
+      if (!moved) return;
+      // Der Klick nach dem Ziehen soll kein Level starten
+      const stop = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+      window.addEventListener('click', stop, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener('click', stop, { capture: true }), 60);
+      const step = cardStep();
+      const target = Math.round(wrap.scrollLeft / step) * step;
+      wrap.classList.remove('dragging');
+      wrap.scrollTo({ left: target, behavior: 'smooth' });
+    });
+  })();
 
   function buildMenu() {
     const wrap = $('levels');
+    const keepScroll = wrap.scrollLeft;
     wrap.innerHTML = '';
     const arts = [];
-    if (menuPage === null) {
-      let first = window.LEVELS.findIndex((d) => !levelSave(d.id).done);
-      if (first < 0) first = 0;
-      menuPage = Math.floor(first / PER_PAGE);
+    if (!menuBuilt) {
+      // beim ersten Öffnen: erstes noch nicht geschafftes Level zeigen
+      const first = window.LEVELS.findIndex((d) => !levelSave(d.id).done);
+      focusLevel = first < 0 ? 0 : first;
+      menuBuilt = true;
     }
-    const from = menuPage * PER_PAGE;
-    const to = Math.min(window.LEVELS.length, from + PER_PAGE);
-    $('pgLabel').innerHTML = '<b>' + (from + 1) + '–' + to + '</b>von ' + window.LEVELS.length;
-    $('pgPrev').disabled = menuPage === 0;
-    $('pgNext').disabled = menuPage >= pageCount() - 1;
     window.LEVELS.forEach((def, i) => {
-      if (i < from || i >= to) return;
       const lvl = E.parseLevel(def);
       const sv = levelSave(def.id);
       const card = document.createElement('div');
@@ -317,7 +383,12 @@
       wrap.appendChild(card);
       arts.push([card.querySelector('canvas'), def, lvl]);
     });
-    requestAnimationFrame(() => arts.forEach((a) => drawCardArt(a[0], a[1], a[2])));
+    wrap.scrollLeft = keepScroll;
+    requestAnimationFrame(() => {
+      if (focusLevel !== null) { scrollToLevel(focusLevel); focusLevel = null; }
+      updatePager();
+      arts.forEach((a) => drawCardArt(a[0], a[1], a[2]));
+    });
 
     const sw = $('swatches');
     sw.querySelectorAll('button').forEach((b) => b.remove());
@@ -348,10 +419,11 @@
   function blurActive() { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
 
   function goMenu() {
-    if (game.level) menuPage = Math.floor(game.levelIndex / PER_PAGE);
+    if (game.level) focusLevel = game.levelIndex;
     game.scene = 'menu';
     game.paused = false;
-    A.stopMusic(true);
+    A.resumeAll();
+    A.playMenuMusic();
     show('menu', true); show('hud', false); show('practiceBar', false); show('pause', false); show('win', false);
     buildMenu();
   }
@@ -373,10 +445,11 @@
       show('pausePractice', game.practice);
       $('togglePracticeBtn').querySelector('span').textContent = game.practice ? 'Normal spielen' : 'Übungsmodus';
       $('togglePracticeBtn').classList.toggle('on', game.practice);
-      A.stopMusic(true);
+      A.pauseAll();
     } else {
+      // genau dort weitermachen, wo pausiert wurde (Spiel und Musik)
       blurActive();
-      if (!game.practice) restartAttempt(); else A.playMusic(game.level.def.music);
+      A.resumeAll();
     }
   }
 
@@ -396,6 +469,7 @@
   // ---------------------------------------------------------------------
   function startLevel(index, practice) {
     A.unlock();
+    A.stopMusic();
     game.levelIndex = index;
     game.level = E.parseLevel(window.LEVELS[index]);
     setTheme(game.level.def);
@@ -438,7 +512,8 @@
     game.state.prevHeld = held;      // gehaltene Taste nicht als neuen Klick zählen
     game.deathTimer = 0;
     game.lastAutoCp = game.state.time;
-    A.playMusic(game.level.def.music);
+    // Im Übungsmodus läuft die Musik beim Sterben einfach weiter
+    if (!game.practice || !A.isPlaying()) A.playMusic(game.level.def.music, game.level.def.difficulty);
   }
 
   function progress() {
@@ -461,7 +536,7 @@
   function onDeath() {
     const s = game.state;
     A.sfx('die');
-    A.stopMusic(false);
+    if (!game.practice) A.stopMusic(false);
     game.deathTimer = 1.0;
     game.shake = 0.35;
     burst(s.x + 0.5, s.y + 0.5, PLAYER_COLORS[save.color], 36, 9);
@@ -1019,6 +1094,7 @@
   }
 
   buildMenu();
+  A.playMenuMusic();   // startet hörbar beim ersten Klick / Tastendruck
   requestAnimationFrame(frame);
 
   // für Tests / Einbettung

@@ -16,7 +16,10 @@ Rakete durch Tunnel und drehst die Schwerkraft um.
 - Würfel- und Raketen-Modus, Sprungfelder, gelbe/blaue Ringe, Schwerkraft-Portale
 - 3 Münzen pro Level, Bestwerte in % (Normal und Übung)
 - Übungsmodus mit automatischen und manuellen Checkpoints
-- Selbst erzeugte Musik und Sounds (Web Audio, keine Audiodateien)
+- Selbst erzeugte Musik und Sounds (Web Audio, keine Audiodateien): jeder Song mit
+  Intro, Drop, Break und zweitem Drop, Stereo-Echo, Hall und „pumpendem“ Bass;
+  schwerere Level klingen energiegeladener, dazu eine ruhige Menü-Musik
+- Scroll-Menü: Level per Wischen, Mausrad, Ziehen oder Pfeiltasten durchblättern
 - 6 Farben für den Würfel
 - Läuft auf PC (Tastatur/Maus) und Handy/Tablet (Touch, Querformat)
 - Fortschritt wird lokal im Browser gespeichert (`localStorage`)
