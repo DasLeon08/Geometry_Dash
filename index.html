@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1030">
+  <meta name="description" content="Neon Hop – ein rhythmischer Hüpf-Runner. Springe, fliege und dreh die Schwerkraft um!">
+  <title>Neon Hop</title>
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --bg: #0b1030;
+      --panel: rgba(10, 14, 40, 0.86);
+      --text: #f4f6ff;
+      --muted: #a9b2df;
+      --accent: #5ee6ff;
+      --accent2: #ff5ec8;
+      --gold: #ffd84a;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+      font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+      -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+    }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+
+    .overlay {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      padding: 16px; z-index: 10; overflow-y: auto;
+    }
+    .overlay.dim { background: rgba(4, 6, 20, 0.6); backdrop-filter: blur(3px); }
+    .hidden { display: none !important; }
+
+    .panel {
+      background: var(--panel); border: 2px solid rgba(255,255,255,0.12); border-radius: 22px;
+      padding: 22px 24px; width: min(860px, 100%); box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      margin: auto;
+    }
+    .panel.small { width: min(420px, 100%); text-align: center; }
+
+    h1.logo {
+      margin: 0; font-size: clamp(38px, 8vw, 72px); letter-spacing: 3px; line-height: 1; text-align: center;
+      font-weight: 900; font-style: italic;
+      background: linear-gradient(90deg, var(--accent), #9b8cff, var(--accent2));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      filter: drop-shadow(0 0 18px rgba(94, 230, 255, 0.45));
+    }
+    .tagline { text-align: center; color: var(--muted); margin: 8px 0 18px; }
+    h2 { margin: 0 0 12px; font-size: 28px; }
+
+    .levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .level {
+      position: relative; border-radius: var(--radius); padding: 16px; overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.18); background: linear-gradient(160deg, var(--c1), var(--c2));
+      display: flex; flex-direction: column; gap: 10px; min-height: 200px;
+    }
+    .level h3 { margin: 0; font-size: 22px; text-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+    .level .meta { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+    .stars { color: var(--gold); letter-spacing: 2px; font-size: 18px; }
+    .coins { letter-spacing: 3px; }
+    .coin-on { color: var(--gold); text-shadow: 0 0 6px rgba(255,216,74,.8); }
+    .coin-off { color: rgba(255,255,255,0.3); }
+    .bar { height: 12px; border-radius: 6px; background: rgba(0,0,0,0.35); overflow: hidden; }
+    .bar > div { height: 100%; background: linear-gradient(90deg, #7dff9a, #2fe0a0); }
+    .bar.practice > div { background: linear-gradient(90deg, #8fd3ff, #5aa0ff); }
+    .bar-label { font-size: 12px; color: rgba(255,255,255,0.85); display: flex; justify-content: space-between; margin-bottom: 3px; }
+    .level .buttons { display: flex; gap: 8px; margin-top: auto; }
+
+    .btn {
+      border: 0; border-radius: 12px; padding: 11px 16px; font-weight: 800; font-size: 16px;
+      background: #fff; color: #141a3d; box-shadow: 0 4px 0 rgba(0,0,0,0.3);
+      transition: transform .08s ease, filter .15s ease;
+    }
+    .btn:hover { filter: brightness(1.08); }
+    .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+    .btn.primary { background: linear-gradient(180deg, #7dff9a, #27c96e); color: #08301b; flex: 1; }
+    .btn.ghost { background: rgba(255,255,255,0.16); color: #fff; }
+    .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+    .settings { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; justify-content: space-between; margin-top: 18px; }
+    .swatches { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .swatch {
+      width: 34px; height: 34px; border-radius: 8px; border: 3px solid transparent; padding: 0;
+      box-shadow: inset 0 0 0 6px rgba(0,0,0,0.25);
+    }
+    .swatch.active { border-color: #fff; transform: scale(1.1); }
+    .help { color: var(--muted); font-size: 14px; margin-top: 14px; text-align: center; line-height: 1.5; }
+    kbd { background: rgba(255,255,255,0.15); border-radius: 5px; padding: 1px 6px; font-family: inherit; }
+
+    .hud { position: fixed; top: 10px; right: 10px; z-index: 5; display: flex; gap: 8px; }
+    .hud-btn {
+      width: 46px; height: 46px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.3);
+      background: rgba(0,0,0,0.35); font-size: 20px; font-weight: 900; display: flex; align-items: center; justify-content: center;
+    }
+    .practice-bar { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; gap: 10px; }
+    .practice-bar .hud-btn { width: auto; padding: 0 14px; font-size: 15px; }
+
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0; text-align: left; }
+    .stats div { background: rgba(255,255,255,0.08); border-radius: 10px; padding: 8px 12px; }
+    .stats b { display: block; font-size: 22px; }
+    .stack { display: flex; flex-direction: column; gap: 10px; }
+
+    .overlay { touch-action: pan-y; }
+    @media (max-height: 520px) {
+      .panel { padding: 14px 16px; }
+      h1.logo { font-size: 40px; }
+      .tagline { margin: 4px 0 10px; font-size: 14px; }
+      .levels { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .level { min-height: 0; padding: 10px 12px; gap: 6px; }
+      .level h3 { font-size: 18px; }
+      .btn { padding: 9px 12px; font-size: 15px; }
+      .settings { margin-top: 10px; }
+      .help { display: none; }
+      .stats { margin: 10px 0; }
+      .stats b { font-size: 18px; }
+    }
+    @media (max-height: 520px) and (max-width: 640px) { .levels { grid-template-columns: 1fr; } }
+
+    #rotate { z-index: 50; background: var(--bg); flex-direction: column; text-align: center; gap: 12px; font-size: 18px; }
+    #rotate .phone { font-size: 56px; animation: tilt 1.6s ease-in-out infinite; }
+    @keyframes tilt { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
+    @media (orientation: portrait) and (max-width: 700px) { #rotate.show-if-portrait { display: flex !important; } }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- Hauptmenü -->
+  <div id="menu" class="overlay dim">
+    <div class="panel">
+      <h1 class="logo">NEON HOP</h1>
+      <p class="tagline">Spring im Takt, flieg durch Tunnel, dreh die Schwerkraft um.</p>
+      <div id="levels" class="levels"></div>
+      <div class="settings">
+        <div class="swatches" id="swatches" aria-label="Farbe wählen"><span>Farbe:</span></div>
+        <button class="btn ghost" id="soundBtn">🔊 Ton an</button>
+      </div>
+      <p class="help">
+        Springen: <kbd>Leertaste</kbd> / <kbd>↑</kbd> / Klick / Tippen &nbsp;·&nbsp; Gedrückt halten = immer wieder springen
+        · Pause: <kbd>Esc</kbd>
+        <br>Übungsmodus: Checkpoints setzen mit <kbd>Z</kbd>, löschen mit <kbd>X</kbd>
+      </p>
+    </div>
+  </div>
+
+  <!-- Spiel-HUD -->
+  <div id="hud" class="hud hidden">
+    <button class="hud-btn" id="pauseBtn" aria-label="Pause">II</button>
+  </div>
+  <div id="practiceBar" class="practice-bar hidden">
+    <button class="hud-btn" id="cpAdd">◆ Checkpoint</button>
+    <button class="hud-btn" id="cpDel">✕ Löschen</button>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="overlay dim hidden">
+    <div class="panel small">
+      <h2>Pause</h2>
+      <p id="pauseInfo" style="color: var(--muted)"></p>
+      <div class="stack">
+        <button class="btn primary" id="resumeBtn">Weiter</button>
+        <button class="btn" id="restartBtn">Neu starten</button>
+        <button class="btn" id="togglePracticeBtn">Übungsmodus</button>
+        <button class="btn ghost" id="menuBtn">Zum Menü</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Geschafft -->
+  <div id="win" class="overlay dim hidden">
+    <div class="panel small">
+      <h2 id="winTitle">Level geschafft!</h2>
+      <div class="coins" id="winCoins" style="font-size: 34px"></div>
+      <div class="stats">
+        <div>Versuche<b id="winAttempts">1</b></div>
+        <div>Sprünge<b id="winJumps">0</b></div>
+        <div>Zeit<b id="winTime">0s</b></div>
+        <div>Modus<b id="winMode">Normal</b></div>
+      </div>
+      <div class="stack">
+        <button class="btn primary" id="nextBtn">Nächstes Level</button>
+        <button class="btn" id="againBtn">Nochmal</button>
+        <button class="btn ghost" id="winMenuBtn">Zum Menü</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="rotate" class="overlay hidden show-if-portrait">
+    <div class="phone">📱</div>
+    <div>Bitte dreh dein Gerät ins Querformat.</div>
+  </div>
+
+  <script src="js/engine.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
