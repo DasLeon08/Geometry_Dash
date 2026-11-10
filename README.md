@@ -57,7 +57,18 @@ js/
 assets/
 ```
 
-`tools/` und die `.md`-Dateien werden im Spiel nicht gebraucht. Als
+`tools/`, `assets/promo/` und die `.md`-Dateien werden im Spiel nicht gebraucht.
+
+Bilder für die Toki-Spielseite liegen in `assets/promo/`:
+
+| Datei | Verwendung |
+| --- | --- |
+| `Neon-Hop-Titelbild.png` | Titelbild (Pixel-Art, 4:3, 1280×960) |
+| `Neon-Hop-Banner.png` | Banner für die Startseite (2:1, 1600×800) |
+| `Screenshot-1…4-*.png` | Screenshots unter dem Spiel (1280×720) |
+
+Titelbild und Banner werden mit `python3 tools/promo/titelbild.py <ordner>` bzw.
+`python3 tools/promo/banner.py <ordner>` erzeugt (benötigt Pillow). Als
 Vorschaubild kann `assets/thumbnail.png` (1280×720) verwendet werden, als
 Icon `assets/icon.svg`.
 
