@@ -10,7 +10,12 @@
   const TS = 40;                 // Pixel pro Kachel (logisch)
   const PLAYER_SCREEN_X = 7;     // Spieler steht so viele Kacheln vom linken Rand
   const SAVE_KEY = 'neonhop.save.v1';
-  const FONT = '"Segoe UI", "SF Pro Rounded", "Nunito", "Trebuchet MS", system-ui, sans-serif';
+  const FONT = 'Fredoka, "Trebuchet MS", system-ui, sans-serif';
+  const INK = '#1d1442';
+  // Schrift für das Canvas vorladen (CSS lädt sie sonst erst bei Bedarf)
+  if (document.fonts && document.fonts.load) {
+    ['600 16px Fredoka', '700 16px Fredoka'].forEach((f) => document.fonts.load(f).catch(() => {}));
+  }
 
   const PLAYER_COLORS = [
     ['#5ee6ff', '#ffef5e'], ['#7dff9a', '#2a7cff'], ['#ff5ec8', '#ffffff'],
@@ -739,10 +744,8 @@
     const k = (time * 1.5) % 1;
     ctx.beginPath(); ctx.ellipse(cx, cy, TS * 0.42 * k, TS * 1.5 * k, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
-    ctx.fillStyle = st[0];
-    ctx.font = '800 13px ' + FONT;
     ctx.textAlign = 'center';
-    ctx.fillText(st[1], cx, cy - TS * 1.75);
+    outlinedText(st[1], cx, cy - TS * 1.75, 14, st[0], 4);
   }
 
   function drawCoin(o) {
@@ -865,44 +868,58 @@
     ctx.closePath();
   }
 
+  /** Text mit dicker dunkler Kontur (Arcade-Stil). */
+  function outlinedText(text, x, y, size, fill, stroke) {
+    ctx.font = '700 ' + size + 'px ' + FONT;
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = stroke;
+    ctx.strokeStyle = INK;
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = fill;
+    ctx.fillText(text, x, y);
+  }
+
   let hudPct = 0;
   function drawHud() {
     const pct = progress();
     hudPct += (pct - hudPct) * 0.25;
     if (pct < hudPct) hudPct = pct;
-    const accent = game.practice ? '#8fd3ff' : game.level.def.colors.accent;
-    const w = Math.min(420, viewW * 0.42), h = 8, x = (viewW - w) / 2, y = 24;
-    // Schiene
-    ctx.fillStyle = 'rgba(5,7,24,0.55)';
-    roundRect(x - 4, y - 4, w + 8, h + 8, (h + 8) / 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+    const accent = game.practice ? '#4cc9f0' : game.level.def.colors.accent;
+    const w = Math.min(400, viewW * 0.4), h = 14, x = (viewW - w) / 2, y = 20;
+    // Schatten + Schiene
+    ctx.fillStyle = INK;
+    roundRect(x - 3, y - 3 + 4, w + 6, h + 6, (h + 6) / 2); ctx.fill();
+    ctx.fillStyle = '#fff8ec';
+    roundRect(x - 3, y - 3, w + 6, h + 6, (h + 6) / 2); ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
     // Füllung
-    const fw = Math.max(h, w * hudPct / 100);
-    const g = ctx.createLinearGradient(x, 0, x + fw, 0);
-    g.addColorStop(0, accent); g.addColorStop(1, '#ffffff');
-    ctx.save();
-    ctx.shadowColor = accent; ctx.shadowBlur = 12;
-    ctx.fillStyle = g;
-    roundRect(x, y, fw, h, h / 2); ctx.fill();
-    ctx.restore();
+    if (hudPct > 0.5) {
+      const fw = Math.max(h, w * hudPct / 100);
+      ctx.save();
+      roundRect(x, y, w, h, h / 2); ctx.clip();
+      ctx.fillStyle = accent;
+      roundRect(x, y, fw, h, h / 2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fillRect(x, y + h - 4, fw, 4);
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.fillRect(x + 4, y + 3, Math.max(0, fw - 8), 3);
+      ctx.restore();
+    }
     // Bestwert-Markierung
     const sv = levelSave(game.level.def.id);
     const best = game.practice ? sv.practice : sv.best;
     if (best > 0 && best < 100) {
       const bx = x + w * best / 100;
-      ctx.fillStyle = '#ffd84a';
-      ctx.fillRect(bx - 1, y - 5, 2, h + 10);
+      ctx.fillStyle = '#ffe066'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(bx - 6, y - 9); ctx.lineTo(bx + 6, y - 9); ctx.lineTo(bx, y - 1); ctx.closePath();
+      ctx.fill(); ctx.stroke();
     }
-    // Prozent
-    ctx.font = '900 15px ' + FONT;
-    ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
-    ctx.fillText(pct + '%', x + w + 14, y + h / 2 + 1);
+    ctx.textAlign = 'left';
+    outlinedText(pct + '%', x + w + 14, y + h / 2 + 1, 20, '#fff', 5);
     ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.font = '800 13px ' + FONT;
-    ctx.fillText(game.practice ? 'Übung' : 'Versuch ' + game.attempts, x - 16, y + h / 2 + 1);
+    outlinedText(game.practice ? 'Übung' : 'Versuch ' + game.attempts, x - 14, y + h / 2 + 1, 16,
+      game.practice ? '#4cc9f0' : '#ffe066', 4);
     ctx.textBaseline = 'alphabetic';
   }
 
@@ -910,10 +927,8 @@
     if (game.practice) return;
     const x = wx(game.attemptStartX + 4);
     if (x < -400) return;
-    ctx.font = '900 44px ' + FONT;
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.fillText('Versuch ' + game.attempts, x, wy(5));
+    outlinedText('Versuch ' + game.attempts, x, wy(5), 46, '#fff', 8);
   }
 
   function render() {

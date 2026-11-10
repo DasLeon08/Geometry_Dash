@@ -21,6 +21,7 @@ Rakete durch Tunnel und drehst die Schwerkraft um.
 - Läuft auf PC (Tastatur/Maus) und Handy/Tablet (Touch, Querformat)
 - Fortschritt wird lokal im Browser gespeichert (`localStorage`)
 - Keine Abhängigkeiten, kein Build-Schritt – reines HTML/CSS/JavaScript
+- Arcade-Look mit der Schrift *Fredoka* (liegt in `assets/fonts/`, SIL Open Font License)
 
 ## Steuerung
 
