@@ -109,6 +109,7 @@
       }
       code = c;
       isHost = true;
+      if (window.toki) window.toki.room(c);
       peer.on('connection', (conn) => {
         if (guests.size >= MAX_GUESTS) {
           // kurz warten, damit die Nachricht sicher ankommt, dann trennen
@@ -149,6 +150,7 @@
         hostConn = conn;
         code = c;
         isHost = false;
+        if (window.toki) window.toki.room(c);
         resolve(c);
       });
       conn.on('data', (msg) => emit('message', { from: 'host', msg }));
@@ -176,6 +178,7 @@
     guests.clear();
     if (hostConn) { const c = hostConn; hostConn = null; try { c.close(); } catch (e) { /* egal */ } }
     if (peer) { const p = peer; peer = null; try { p.destroy(); } catch (e) { /* egal */ } }
+    if (code && window.toki) window.toki.room(null);
     isHost = false;
     code = null;
   }

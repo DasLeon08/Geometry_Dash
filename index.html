@@ -362,6 +362,87 @@
     }
     @media (max-width: 600px) { .levels { --peek: 1.6; } }
   </style>
+  <script>
+/* Toki save support v4. Put this in the game's HTML <head>, before the game's own scripts.
+   Inside Toki, it keeps a copy of everything the game stores in localStorage, so progress
+   survives closing the app (iPhone deletes storage of games shown inside other sites) and
+   follows logged-in players to other devices. Outside Toki it does nothing.
+   High scores: call toki.score(points) when a round ends (for times: milliseconds).
+   Multiplayer: call toki.room(code) when the player is in a room others can join with that
+   code (toki.room(null) when they leave it), so they can invite their Toki friends. */
+(function () {
+  // Games hosted on Toki get this script added for them; a second copy in the game does nothing.
+  if (window.__tokiSave) return;
+  window.__tokiSave = 1;
+  var top = window.parent;
+  var inToki = top !== window;
+  var origin = (location.ancestorOrigins && location.ancestorOrigins[0]) ||
+    (document.referrer ? new URL(document.referrer).origin : "*");
+  window.toki = window.toki || {};
+  window.toki.score = function (n) {
+    if (inToki && typeof n === "number" && isFinite(n)) top.postMessage({ toki: 1, type: "score", data: n }, origin);
+  };
+  window.toki.room = function (code) {
+    if (inToki) top.postMessage({ toki: 1, type: "room", data: code == null || code === "" ? null : String(code) }, origin);
+  };
+  if (!inToki) return;
+  var ls, MARK = "__toki_t";
+  try { ls = window.localStorage; ls.getItem(MARK); } catch (e) { return; }
+  var P = Storage.prototype, raw = { set: P.setItem, clear: P.clear };
+  var ready = false, answered = false, restoring = false, timer = null;
+
+  function send(type, data) { top.postMessage({ toki: 1, type: type, data: data }, origin); }
+  function keys() {
+    var out = {};
+    for (var i = 0; i < ls.length; i++) { var k = ls.key(i); if (k !== MARK) out[k] = ls.getItem(k); }
+    return out;
+  }
+  function flush() {
+    clearTimeout(timer); timer = null;
+    var t = Date.now();
+    raw.set.call(ls, MARK, String(t));
+    send("store", { keys: keys(), t: t });
+  }
+  // Games often save while the app is closing: send that right away.
+  function later() { if (document.hidden) return flush(); clearTimeout(timer); timer = setTimeout(flush, 400); }
+
+  ["setItem", "removeItem", "clear"].forEach(function (name) {
+    var fn = P[name];
+    P[name] = function () {
+      // Putting Toki's save back: the game may still save its old state before the reload.
+      if (this === ls && restoring) return;
+      var r = fn.apply(this, arguments);
+      if (this === ls && ready) later();
+      return r;
+    };
+  });
+
+  window.addEventListener("message", function (e) {
+    var m = e.data;
+    if (e.source !== top || !m || m.toki !== 1 || m.type !== "save" || answered) return;
+    answered = true;
+    var save = m.data, mine = Number(ls.getItem(MARK)) || 0;
+    if (save && save.keys && save.t > mine) {
+      // Toki has newer progress: put it back and restart the game once.
+      raw.clear.call(ls);
+      for (var k in save.keys) raw.set.call(ls, k, save.keys[k]);
+      raw.set.call(ls, MARK, String(save.t));
+      restoring = true;
+      location.reload();
+      return;
+    }
+    ready = true;
+    var has = false;
+    for (var key in keys()) { has = true; break; }
+    if (has && (!save || mine > save.t)) later();
+  });
+  // No answer (an older Toki): after a while, keep the game working as before.
+  setTimeout(function () { ready = true; }, 10000);
+  window.addEventListener("pagehide", function () { if (timer) flush(); });
+  document.addEventListener("visibilitychange", function () { if (document.hidden && timer) flush(); });
+  send("hello");
+})();
+  </script>
 </head>
 <body>
   <!-- Icons -->
@@ -542,5 +623,100 @@
   <script src="js/audio.js"></script>
   <script src="js/multiplayer.js"></script>
   <script src="js/game.js"></script>
+  <script>
+/* Toki-Integration: Punkte (Bestwert in %) und Raumcode aus der Adresse. */
+(function () {
+  var scoreKey = /best|progress|pct|percent|score|highscore/i;
+  var skipKey = /practice|ueb/i;
+  var gameScored = false;
+  if (window.toki && typeof window.toki.score === 'function') {
+    var origScore = window.toki.score;
+    window.toki.score = function (n) { gameScored = true; return origScore(n); };
+  }
+  function sendScore(s) {
+    if (!gameScored && s > 0 && window.toki) window.toki.score(s);
+  }
+  function extractScore(value, keyName) {
+    var best = 0;
+    function walk(v, k, force) {
+      if (v == null || skipKey.test(k)) return;
+      var take = force || scoreKey.test(k);
+      if (typeof v === 'number') {
+        if (take) {
+          if (v >= 0 && v <= 100) best = Math.max(best, v);
+          else if (v >= 0 && v <= 1) best = Math.max(best, v * 100);
+        }
+      } else if (typeof v === 'object') {
+        for (var p in v) walk(v[p], p, take);
+      }
+    }
+    if (typeof value === 'number') walk(value, keyName, false);
+    else {
+      var n = Number(value);
+      if (value !== null && value !== '' && isFinite(n)) walk(n, keyName, false);
+      else { try { walk(JSON.parse(value), keyName, false); } catch (e) {} }
+    }
+    return Math.round(best);
+  }
+  function scanStorage() {
+    var best = 0;
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k === '__toki_t') continue;
+        best = Math.max(best, extractScore(localStorage.getItem(k), k));
+      }
+    } catch (e) {}
+    return best;
+  }
+  var monitoring = false, lastSent = 0;
+  function maybeSend() {
+    if (!monitoring) return;
+    var s = scanStorage();
+    if (s > lastSent) { lastSent = s; sendScore(s); }
+  }
+  try {
+    var origSet = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = function (k, v) {
+      origSet(k, v);
+      maybeSend();
+    };
+  } catch (e) {}
+  document.addEventListener('DOMContentLoaded', function () {
+    lastSent = scanStorage();
+    monitoring = true;
+    var win = document.getElementById('win');
+    if (win) {
+      var wasHidden = win.classList.contains('hidden');
+      new MutationObserver(function () {
+        var hidden = win.classList.contains('hidden');
+        if (wasHidden && !hidden) {
+          var s = scanStorage();
+          if (!s) s = 100;
+          if (s > lastSent) { lastSent = s; sendScore(s); }
+        }
+        wasHidden = hidden;
+      }).observe(win, { attributes: true, attributeFilter: ['class'] });
+    }
+    var room = new URLSearchParams(location.search).get('room');
+    if (!room && location.hash) {
+      try { room = new URLSearchParams(location.hash.slice(1)).get('room'); } catch (e) {}
+    }
+    if (room) {
+      var code = String(room).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+      if (code) {
+        var input = document.getElementById('mpCode');
+        var mp = document.getElementById('mp');
+        var handled = (input && input.value.toUpperCase() === code) || (mp && !mp.classList.contains('hidden'));
+        if (!handled) {
+          var btn = document.getElementById('mpBtn');
+          if (btn) btn.click();
+          if (input) input.value = code;
+        }
+      }
+    }
+  });
+})();
+  </script>
 </body>
 </html>
