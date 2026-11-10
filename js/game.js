@@ -10,6 +10,7 @@
   const TS = 40;                 // Pixel pro Kachel (logisch)
   const PLAYER_SCREEN_X = 7;     // Spieler steht so viele Kacheln vom linken Rand
   const SAVE_KEY = 'neonhop.save.v1';
+  const FONT = '"Segoe UI", "SF Pro Rounded", "Nunito", "Trebuchet MS", system-ui, sans-serif';
 
   const PLAYER_COLORS = [
     ['#5ee6ff', '#ffef5e'], ['#7dff9a', '#2a7cff'], ['#ff5ec8', '#ffffff'],
@@ -167,49 +168,119 @@
   const $ = (id) => document.getElementById(id);
   function show(id, on) { $(id).classList.toggle('hidden', !on); }
 
-  function stars(n) { return '★★★'.slice(0, n) + '☆☆☆'.slice(0, 3 - n); }
   const DIFF_NAMES = ['', 'Leicht', 'Mittel', 'Schwer'];
+  const icon = (name) => '<svg class="i"><use href="#i-' + name + '"/></svg>';
 
-  function coinHtml(level, got) {
-    let html = '';
-    for (let i = 0; i < level.coinCount; i++) {
-      html += '<span class="' + (got.indexOf(i) !== -1 ? 'coin-on' : 'coin-off') + '">●</span>';
+  /** Farben des Levels für Menüs und Anzeige übernehmen. */
+  function setTheme(def) {
+    const root = document.documentElement.style;
+    root.setProperty('--lvl', def.colors.accent);
+    root.setProperty('--lvl-bg', def.colors.bgBottom);
+  }
+
+  /** Kleine Vorschau des Levelanfangs für die Menükarte zeichnen. */
+  function drawCardArt(cv, def, lvl) {
+    const w = cv.clientWidth || 300, h = cv.clientHeight || 118;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const c = cv.getContext('2d');
+    c.scale(dpr, dpr);
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, def.colors.bgTop);
+    g.addColorStop(1, def.colors.bgBottom);
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    const ts = Math.max(10, Math.round(h / 7));
+    const gy = h - ts * 1.1;
+    // Abwechslungsreichsten Ausschnitt wählen (Blöcke, ein paar Stacheln, Extras)
+    const cols = Math.ceil(w / ts);
+    const maxY = h < 90 ? 2 : 4;
+    let bestX = 14, bestN = -1;
+    for (let x = 14; x < Math.min(lvl.length - cols, 160); x += 2) {
+      let blocks = 0, spikes = 0, extras = 0;
+      lvl.objects.forEach((o) => {
+        if (o.x < x || o.x >= x + cols || o.y > maxY) return;
+        if (o.type === 'block') blocks++;
+        else if (o.type === 'spike' || o.type === 'mini') spikes++;
+        else if (o.type === 'orb' || o.type === 'pad' || o.type === 'coin') extras++;
+      });
+      const n = Math.min(blocks, 14) + Math.min(spikes, 5) + extras * 3;
+      if (n > bestN) { bestN = n; bestX = x; }
     }
-    return html;
+    c.fillStyle = def.colors.ground; c.fillRect(0, gy, w, h - gy);
+    c.fillStyle = def.colors.accent; c.fillRect(0, gy - 1, w, 2);
+    lvl.objects.forEach((o) => {
+      if (o.x < bestX - 1 || o.x > bestX + cols || o.y > maxY) return;
+      const x = (o.x - bestX) * ts, y = gy - (o.y + 1) * ts;
+      if (o.type === 'block') {
+        c.fillStyle = 'rgba(0,0,0,0.45)'; c.fillRect(x, y, ts, ts);
+        c.strokeStyle = def.colors.accent; c.lineWidth = 1.5; c.strokeRect(x + 0.75, y + 0.75, ts - 1.5, ts - 1.5);
+      } else if (o.type === 'spike' || o.type === 'mini') {
+        const sh = o.type === 'mini' ? ts * 0.45 : ts * 0.95;
+        c.beginPath(); c.moveTo(x + 1, y + ts); c.lineTo(x + ts / 2, y + ts - sh); c.lineTo(x + ts - 1, y + ts); c.closePath();
+        c.fillStyle = '#05060f'; c.fill(); c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 1; c.stroke();
+      } else if (o.type === 'orb' || o.type === 'pad' || o.type === 'coin') {
+        c.fillStyle = o.type === 'coin' ? '#ffd84a' : '#ffe14a';
+        c.beginPath();
+        if (o.type === 'pad') c.ellipse(x + ts / 2, y + ts, ts * 0.4, ts * 0.2, 0, Math.PI, 0);
+        else c.arc(x + ts / 2, y + ts / 2, ts * 0.3, 0, Math.PI * 2);
+        c.fill();
+      }
+    });
+    // Spielfigur
+    const cols2 = PLAYER_COLORS[save.color];
+    const px = ts * 2, py = gy - ts;
+    c.fillStyle = cols2[0]; c.fillRect(px, py, ts, ts);
+    c.fillStyle = cols2[1]; c.fillRect(px + ts * 0.22, py + ts * 0.22, ts * 0.56, ts * 0.56);
+    c.strokeStyle = '#000'; c.lineWidth = 1.5; c.strokeRect(px, py, ts, ts);
+    // Abdunkeln nach unten, damit Text lesbar bleibt
+    const shade = c.createLinearGradient(0, h * 0.4, 0, h);
+    shade.addColorStop(0, 'rgba(14,18,48,0)');
+    shade.addColorStop(1, 'rgba(14,18,48,0.75)');
+    c.fillStyle = shade; c.fillRect(0, 0, w, h);
   }
 
   function buildMenu() {
     const wrap = $('levels');
     wrap.innerHTML = '';
+    const arts = [];
     window.LEVELS.forEach((def, i) => {
       const lvl = E.parseLevel(def);
       const sv = levelSave(def.id);
       const card = document.createElement('div');
-      card.className = 'level';
-      card.style.setProperty('--c1', def.colors.bgTop);
-      card.style.setProperty('--c2', def.colors.bgBottom);
+      card.className = 'card';
+      card.style.setProperty('--c', def.colors.accent);
+      let coins = '';
+      for (let k = 0; k < lvl.coinCount; k++) coins += '<i class="' + (sv.coins.indexOf(k) !== -1 ? 'got' : '') + '"></i>';
       card.innerHTML =
-        '<div class="meta"><span>Level ' + (i + 1) + (sv.done ? ' ✔' : '') + '</span>' +
-        '<span class="stars" title="' + DIFF_NAMES[def.difficulty] + '">' + stars(def.difficulty) + '</span></div>' +
-        '<h3>' + def.name + '</h3>' +
-        '<div class="meta"><span>' + DIFF_NAMES[def.difficulty] + '</span><span class="coins">' + coinHtml(lvl, sv.coins) + '</span></div>' +
-        '<div><div class="bar-label"><span>Normal</span><span>' + sv.best + '%</span></div>' +
-        '<div class="bar"><div style="width:' + sv.best + '%"></div></div></div>' +
-        '<div><div class="bar-label"><span>Übung</span><span>' + sv.practice + '%</span></div>' +
-        '<div class="bar practice"><div style="width:' + sv.practice + '%"></div></div></div>' +
-        '<div class="buttons"></div>';
+        '<div class="card-art"><canvas></canvas><span class="card-num">Level ' + (i + 1) + '</span>' +
+          (sv.done ? '<span class="card-done" title="Geschafft">' + icon('check') + '</span>' : '') + '</div>' +
+        '<div class="card-body">' +
+          '<div class="card-row"><h3>' + def.name + '</h3></div>' +
+          '<div class="card-row"><span class="badge d' + def.difficulty + '">' + DIFF_NAMES[def.difficulty] + '</span>' +
+            '<span class="mini-coins" title="Münzen">' + coins + '</span></div>' +
+          '<div class="progress">' +
+            '<div class="progress-label"><span>Bestwert</span><b>' + sv.best + '%</b></div>' +
+            '<div class="track"><div style="width:' + sv.best + '%"></div></div>' +
+            '<div class="progress-label"><span>Übung</span><span>' + sv.practice + '%</span></div>' +
+            '<div class="track practice"><div style="width:' + sv.practice + '%"></div></div>' +
+          '</div>' +
+          '<div class="card-buttons"></div>' +
+        '</div>';
       const play = document.createElement('button');
-      play.className = 'btn primary';
-      play.textContent = '▶ Spielen';
+      play.className = 'btn-go';
+      play.innerHTML = icon('play') + 'Spielen';
       play.onclick = () => startLevel(i, false);
       const prac = document.createElement('button');
-      prac.className = 'btn ghost';
-      prac.textContent = 'Üben';
+      prac.className = 'btn-practice';
+      prac.innerHTML = icon('flag');
       prac.title = 'Übungsmodus mit Checkpoints';
+      prac.setAttribute('aria-label', 'Üben: ' + def.name);
       prac.onclick = () => startLevel(i, true);
-      card.querySelector('.buttons').append(play, prac);
+      card.querySelector('.card-buttons').append(play, prac);
       wrap.appendChild(card);
+      arts.push([card.querySelector('canvas'), def, lvl]);
     });
+    requestAnimationFrame(() => arts.forEach((a) => drawCardArt(a[0], a[1], a[2])));
 
     const sw = $('swatches');
     sw.querySelectorAll('button').forEach((b) => b.remove());
@@ -217,7 +288,7 @@
       const b = document.createElement('button');
       b.className = 'swatch' + (save.color === i ? ' active' : '');
       b.style.background = c[0];
-      b.style.boxShadow = 'inset 0 0 0 7px ' + c[1];
+      b.style.boxShadow = 'inset 0 0 0 7px ' + c[0] + ', inset 0 0 0 16px ' + c[1];
       b.setAttribute('aria-label', 'Farbe ' + (i + 1));
       b.onclick = () => { save.color = i; writeSave(); A.sfx('click'); buildMenu(); };
       sw.appendChild(b);
@@ -225,7 +296,10 @@
     updateSoundBtn();
   }
 
-  function updateSoundBtn() { $('soundBtn').textContent = save.muted ? '🔇 Ton aus' : '🔊 Ton an'; }
+  function updateSoundBtn() {
+    $('soundBtn').innerHTML = icon(save.muted ? 'mute' : 'sound');
+    $('soundBtn').title = save.muted ? 'Ton ist aus' : 'Ton ist an';
+  }
   $('soundBtn').onclick = () => {
     save.muted = !save.muted;
     A.setMuted(save.muted);
@@ -251,8 +325,16 @@
     show('pause', game.paused);
     if (game.paused) {
       const pct = progress();
-      $('pauseInfo').textContent = window.LEVELS[game.levelIndex].name + ' · ' + pct + '% · Versuch ' + game.attempts;
-      $('togglePracticeBtn').textContent = game.practice ? 'Normaler Modus' : 'Übungsmodus';
+      const def = window.LEVELS[game.levelIndex];
+      const sv = levelSave(def.id);
+      $('pauseRing').style.setProperty('--p', pct);
+      $('pausePct').textContent = pct + '%';
+      $('pauseLevel').textContent = def.name;
+      $('pauseAttempt').textContent = 'Versuch ' + game.attempts;
+      $('pauseBest').textContent = 'Bestwert ' + (game.practice ? sv.practice : sv.best) + '%';
+      show('pausePractice', game.practice);
+      $('togglePracticeBtn').querySelector('span').textContent = game.practice ? 'Normal spielen' : 'Übungsmodus';
+      $('togglePracticeBtn').classList.toggle('on', game.practice);
       A.stopMusic(true);
     } else {
       blurActive();
@@ -278,6 +360,7 @@
     A.unlock();
     game.levelIndex = index;
     game.level = E.parseLevel(window.LEVELS[index]);
+    setTheme(game.level.def);
     game.practice = practice;
     game.checkpoints = [];
     game.attempts = 0;
@@ -377,13 +460,13 @@
     }
     show('hud', false); show('practiceBar', false);
     const coinIds = game.level.objects.filter((o) => o.type === 'coin').map((o) => o.id);
-    $('winTitle').textContent = game.practice ? 'Übung geschafft!' : 'Level geschafft!';
-    $('winCoins').innerHTML = coinIds.map((id) => '<span class="' + (s.coins.has(id) ? 'coin-on' : 'coin-off') + '">●</span>').join(' ');
+    $('winLevel').textContent = 'Level ' + (game.levelIndex + 1) + ' · ' + game.level.def.name;
+    $('winTitle').textContent = game.practice ? 'Übung geschafft!' : 'Geschafft!';
+    $('winCoins').innerHTML = coinIds.map((id) => '<span class="coin' + (s.coins.has(id) ? ' got' : '') + '"></span>').join('');
     $('winAttempts').textContent = game.attempts;
     $('winJumps').textContent = game.jumps;
     $('winTime').textContent = s.time.toFixed(1) + 's';
-    $('winMode').textContent = game.practice ? 'Übung' : 'Normal';
-    $('nextBtn').textContent = game.levelIndex + 1 < window.LEVELS.length ? 'Nächstes Level' : 'Zurück zu Level 1';
+    $('nextLabel').textContent = game.levelIndex + 1 < window.LEVELS.length ? 'Nächstes Level' : 'Zurück zu Level 1';
   }
 
   function simulate(dt) {
@@ -624,7 +707,7 @@
     ctx.beginPath(); ctx.ellipse(cx, cy, TS * 0.42 * k, TS * 1.5 * k, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
     ctx.fillStyle = st[0];
-    ctx.font = 'bold 13px "Trebuchet MS", sans-serif';
+    ctx.font = '800 13px ' + FONT;
     ctx.textAlign = 'center';
     ctx.fillText(st[1], cx, cy - TS * 1.75);
   }
@@ -739,29 +822,62 @@
     }
   }
 
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  let hudPct = 0;
   function drawHud() {
     const pct = progress();
-    const w = Math.min(360, viewW * 0.4), h = 12, x = (viewW - w) / 2, y = 18;
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.fillRect(x - 3, y - 3, w + 6, h + 6);
-    ctx.fillStyle = game.practice ? '#5aa0ff' : '#7dff9a';
-    ctx.fillRect(x, y, w * pct / 100, h);
-    ctx.font = 'bold 16px "Trebuchet MS", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#fff';
-    ctx.fillText(pct + '%', x + w + 12, y + 12);
-    ctx.textAlign = 'center';
-    if (game.practice) {
-      ctx.fillStyle = '#8fd3ff';
-      ctx.fillText('ÜBUNGSMODUS', viewW / 2, y + 36);
+    hudPct += (pct - hudPct) * 0.25;
+    if (pct < hudPct) hudPct = pct;
+    const accent = game.practice ? '#8fd3ff' : game.level.def.colors.accent;
+    const w = Math.min(420, viewW * 0.42), h = 8, x = (viewW - w) / 2, y = 24;
+    // Schiene
+    ctx.fillStyle = 'rgba(5,7,24,0.55)';
+    roundRect(x - 4, y - 4, w + 8, h + 8, (h + 8) / 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+    // Füllung
+    const fw = Math.max(h, w * hudPct / 100);
+    const g = ctx.createLinearGradient(x, 0, x + fw, 0);
+    g.addColorStop(0, accent); g.addColorStop(1, '#ffffff');
+    ctx.save();
+    ctx.shadowColor = accent; ctx.shadowBlur = 12;
+    ctx.fillStyle = g;
+    roundRect(x, y, fw, h, h / 2); ctx.fill();
+    ctx.restore();
+    // Bestwert-Markierung
+    const sv = levelSave(game.level.def.id);
+    const best = game.practice ? sv.practice : sv.best;
+    if (best > 0 && best < 100) {
+      const bx = x + w * best / 100;
+      ctx.fillStyle = '#ffd84a';
+      ctx.fillRect(bx - 1, y - 5, 2, h + 10);
     }
+    // Prozent
+    ctx.font = '900 15px ' + FONT;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(pct + '%', x + w + 14, y + h / 2 + 1);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '800 13px ' + FONT;
+    ctx.fillText(game.practice ? 'Übung' : 'Versuch ' + game.attempts, x - 16, y + h / 2 + 1);
+    ctx.textBaseline = 'alphabetic';
   }
 
   function drawAttemptText() {
     if (game.practice) return;
     const x = wx(game.attemptStartX + 4);
     if (x < -400) return;
-    ctx.font = 'bold 44px "Trebuchet MS", sans-serif';
+    ctx.font = '900 44px ' + FONT;
     ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.fillText('Versuch ' + game.attempts, x, wy(5));

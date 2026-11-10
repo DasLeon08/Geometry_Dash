@@ -10,181 +10,357 @@
   <style>
     :root {
       --bg: #0b1030;
-      --panel: rgba(10, 14, 40, 0.86);
       --text: #f4f6ff;
-      --muted: #a9b2df;
-      --accent: #5ee6ff;
-      --accent2: #ff5ec8;
+      --muted: rgba(225, 231, 255, 0.68);
+      --line: rgba(255, 255, 255, 0.14);
+      --glass: rgba(14, 18, 48, 0.72);
       --gold: #ffd84a;
-      --radius: 16px;
+      --go: #6dffa0;
+      --go-dark: #1fc46a;
+      /* Farbe des aktuellen Levels (wird von game.js gesetzt) */
+      --lvl: #7fd3ff;
+      --lvl-bg: #3156d3;
+      --font: "Segoe UI", "SF Pro Rounded", "Nunito", "Trebuchet MS", system-ui, sans-serif;
     }
     * { box-sizing: border-box; }
     html, body {
       margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
-      font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+      font-family: var(--font);
       -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
       touch-action: none;
     }
-    canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-    button { font: inherit; color: inherit; cursor: pointer; }
-
-    .overlay {
-      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-      padding: 16px; z-index: 10; overflow-y: auto;
-    }
-    .overlay.dim { background: rgba(4, 6, 20, 0.6); backdrop-filter: blur(3px); }
+    canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    button:focus-visible { outline: 3px solid var(--lvl); outline-offset: 3px; }
     .hidden { display: none !important; }
+    svg.i { width: 1.15em; height: 1.15em; fill: currentColor; flex: none; }
+
+    /* ---------- Overlays & Panels ---------- */
+    .overlay {
+      position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+      padding: 16px; overflow-y: auto; touch-action: pan-y;
+    }
+    .overlay.dim {
+      background: radial-gradient(ellipse at center, rgba(5, 7, 24, 0.45), rgba(5, 7, 24, 0.82));
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    .overlay.dim > .panel { animation: pop .22s cubic-bezier(.2, 1.4, .4, 1); }
+    @keyframes pop { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
     .panel {
-      background: var(--panel); border: 2px solid rgba(255,255,255,0.12); border-radius: 22px;
-      padding: 22px 24px; width: min(860px, 100%); box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-      margin: auto;
+      position: relative; margin: auto; width: min(400px, 100%);
+      padding: 26px 24px 22px; border-radius: 26px; text-align: center;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02) 40%),
+        var(--glass);
+      border: 1px solid var(--line);
+      box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.3),
+        0 24px 70px rgba(0, 0, 0, 0.55),
+        0 0 60px color-mix(in srgb, var(--lvl) 22%, transparent);
     }
-    .panel.small { width: min(420px, 100%); text-align: center; }
+    .panel::before { /* leuchtende Kante oben */
+      content: ""; position: absolute; left: 22%; right: 22%; top: -1px; height: 2px; border-radius: 2px;
+      background: linear-gradient(90deg, transparent, var(--lvl), transparent);
+      box-shadow: 0 0 14px var(--lvl);
+    }
+    .eyebrow {
+      font-size: 12px; font-weight: 800; letter-spacing: .22em; text-transform: uppercase;
+      color: var(--lvl); text-shadow: 0 0 12px color-mix(in srgb, var(--lvl) 60%, transparent);
+    }
+    .title { margin: 4px 0 0; font-size: 34px; font-weight: 900; letter-spacing: .02em; line-height: 1.1; }
 
+    /* ---------- Buttons ---------- */
+    .btn-go {
+      width: 100%; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 10px;
+      font-size: 19px; font-weight: 900; letter-spacing: .02em; color: #06321a;
+      background: linear-gradient(180deg, #9dffbf, var(--go) 45%, var(--go-dark));
+      box-shadow: 0 5px 0 #0f7d42, 0 10px 26px rgba(61, 255, 140, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      transition: transform .08s, filter .15s, box-shadow .08s;
+    }
+    .btn-go:hover { filter: brightness(1.06); }
+    .btn-go:active { transform: translateY(3px); box-shadow: 0 2px 0 #0f7d42, 0 6px 16px rgba(61, 255, 140, 0.3), inset 0 1px 0 rgba(255,255,255,.7); }
+    .btn-go svg.i { width: 22px; height: 22px; }
+
+    .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+    .tile {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+      min-height: 74px; padding: 10px 4px; border-radius: 16px;
+      font-size: 13px; font-weight: 800; color: var(--text);
+      background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line);
+      transition: background .15s, border-color .15s, transform .08s;
+    }
+    .tile svg.i { width: 24px; height: 24px; color: var(--lvl); }
+    .tile:hover { background: rgba(255, 255, 255, 0.13); border-color: color-mix(in srgb, var(--lvl) 60%, transparent); }
+    .tile:active { transform: scale(.96); }
+    .tile.on { border-color: var(--lvl); background: color-mix(in srgb, var(--lvl) 18%, transparent); }
+
+    .icon-btn {
+      width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      background: rgba(10, 14, 40, 0.55); border: 2px solid rgba(255, 255, 255, 0.55);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+      transition: transform .08s, background .15s;
+    }
+    .icon-btn svg.i { width: 22px; height: 22px; }
+    .icon-btn:hover { background: rgba(255, 255, 255, 0.18); }
+    .icon-btn:active { transform: scale(.92); }
+
+    .hint { margin-top: 14px; font-size: 12px; color: var(--muted); }
+    kbd {
+      display: inline-block; min-width: 22px; padding: 1px 6px; border-radius: 6px; font: inherit; font-weight: 800; font-size: 11px;
+      background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.18); border-bottom-width: 2px;
+    }
+
+    /* ---------- Pause ---------- */
+    .pause-head { display: flex; align-items: center; gap: 16px; text-align: left; margin-bottom: 18px; }
+    .ring {
+      --p: 0; position: relative; width: 84px; height: 84px; flex: none; border-radius: 50%;
+      background: conic-gradient(var(--lvl) calc(var(--p) * 1%), rgba(255, 255, 255, 0.1) 0);
+      filter: drop-shadow(0 0 10px color-mix(in srgb, var(--lvl) 50%, transparent));
+    }
+    .ring::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: #11163a; }
+    .ring span { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 800; background: rgba(255, 255, 255, 0.09); border: 1px solid var(--line);
+    }
+    .chip svg.i { width: 13px; height: 13px; color: var(--lvl); }
+    .chip.practice { color: #0b1030; background: #8fd3ff; border-color: transparent; }
+
+    /* ---------- Geschafft ---------- */
+    .win-coins { display: flex; justify-content: center; gap: 14px; margin: 18px 0 16px; }
+    .coin {
+      width: 46px; height: 46px; border-radius: 50%; position: relative;
+      background: rgba(255, 255, 255, 0.08); border: 2px dashed rgba(255, 255, 255, 0.25);
+    }
+    .coin.got {
+      border: 0; background: radial-gradient(circle at 35% 30%, #fff6c4, var(--gold) 45%, #c99700);
+      box-shadow: 0 0 22px rgba(255, 216, 74, 0.6), inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+      animation: coin-in .5s cubic-bezier(.2, 1.6, .4, 1) both;
+    }
+    .coin.got::after { content: ""; position: absolute; inset: 11px; border-radius: 50%; border: 3px solid rgba(150, 105, 0, 0.55); }
+    .win-coins .coin:nth-child(2) { animation-delay: .12s; }
+    .win-coins .coin:nth-child(3) { animation-delay: .24s; }
+    @keyframes coin-in { from { transform: scale(0) rotate(-90deg); } to { transform: scale(1) rotate(0); } }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+    .stat { padding: 10px 6px; border-radius: 14px; background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line); }
+    .stat svg.i { width: 18px; height: 18px; color: var(--lvl); }
+    .stat b { display: block; font-size: 20px; font-weight: 900; margin-top: 2px; }
+    .stat small { font-size: 11px; color: var(--muted); font-weight: 700; }
+
+    /* ---------- Hauptmenü ---------- */
+    #menu { align-items: flex-start; }
+    .menu-wrap { width: min(980px, 100%); margin: auto; }
+    .menu-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .logo-block { text-align: left; }
     h1.logo {
-      margin: 0; font-size: clamp(38px, 8vw, 72px); letter-spacing: 3px; line-height: 1; text-align: center;
-      font-weight: 900; font-style: italic;
-      background: linear-gradient(90deg, var(--accent), #9b8cff, var(--accent2));
+      margin: 0; font-size: clamp(36px, 6.5vw, 64px); line-height: .95; font-weight: 900; font-style: italic; letter-spacing: .04em;
+      background: linear-gradient(90deg, #5ee6ff, #9b8cff 50%, #ff5ec8);
       -webkit-background-clip: text; background-clip: text; color: transparent;
-      filter: drop-shadow(0 0 18px rgba(94, 230, 255, 0.45));
+      filter: drop-shadow(0 0 22px rgba(120, 170, 255, 0.5));
     }
-    .tagline { text-align: center; color: var(--muted); margin: 8px 0 18px; }
-    h2 { margin: 0 0 12px; font-size: 28px; }
+    .tagline { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
+    .menu-actions { display: flex; gap: 10px; }
 
-    .levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
-    .level {
-      position: relative; border-radius: var(--radius); padding: 16px; overflow: hidden;
-      border: 2px solid rgba(255,255,255,0.18); background: linear-gradient(160deg, var(--c1), var(--c2));
-      display: flex; flex-direction: column; gap: 10px; min-height: 200px;
+    .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card {
+      --c: #7fd3ff; position: relative; display: flex; flex-direction: column; overflow: hidden; text-align: left;
+      border-radius: 24px; background: var(--glass); border: 1px solid var(--line);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s;
     }
-    .level h3 { margin: 0; font-size: 22px; text-shadow: 0 2px 6px rgba(0,0,0,0.4); }
-    .level .meta { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-    .stars { color: var(--gold); letter-spacing: 2px; font-size: 18px; }
-    .coins { letter-spacing: 3px; }
-    .coin-on { color: var(--gold); text-shadow: 0 0 6px rgba(255,216,74,.8); }
-    .coin-off { color: rgba(255,255,255,0.3); }
-    .bar { height: 12px; border-radius: 6px; background: rgba(0,0,0,0.35); overflow: hidden; }
-    .bar > div { height: 100%; background: linear-gradient(90deg, #7dff9a, #2fe0a0); }
-    .bar.practice > div { background: linear-gradient(90deg, #8fd3ff, #5aa0ff); }
-    .bar-label { font-size: 12px; color: rgba(255,255,255,0.85); display: flex; justify-content: space-between; margin-bottom: 3px; }
-    .level .buttons { display: flex; gap: 8px; margin-top: auto; }
-
-    .btn {
-      border: 0; border-radius: 12px; padding: 11px 16px; font-weight: 800; font-size: 16px;
-      background: #fff; color: #141a3d; box-shadow: 0 4px 0 rgba(0,0,0,0.3);
-      transition: transform .08s ease, filter .15s ease;
+    .card:hover { transform: translateY(-4px); border-color: color-mix(in srgb, var(--c) 70%, transparent);
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5), 0 0 40px color-mix(in srgb, var(--c) 30%, transparent); }
+    .card-art { position: relative; height: 118px; }
+    .card-art canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .card-num {
+      position: absolute; top: 12px; left: 12px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 900;
+      background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.2);
     }
-    .btn:hover { filter: brightness(1.08); }
-    .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.3); }
-    .btn.primary { background: linear-gradient(180deg, #7dff9a, #27c96e); color: #08301b; flex: 1; }
-    .btn.ghost { background: rgba(255,255,255,0.16); color: #fff; }
-    .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .card-done {
+      position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; color: #06321a; background: var(--go);
+      box-shadow: 0 0 16px rgba(109, 255, 160, 0.6);
+    }
+    .card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+    .card h3 { margin: 0; font-size: 22px; font-weight: 900; }
+    .card-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .badge { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 900; color: #0b1030; }
+    .badge.d1 { background: #7dff9a; } .badge.d2 { background: #ffd84a; } .badge.d3 { background: #ff6b8b; }
+    .mini-coins { display: flex; gap: 5px; }
+    .mini-coins i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.3); }
+    .mini-coins i.got { border: 0; background: radial-gradient(circle at 35% 30%, #fff6c4, var(--gold) 50%, #c99700); box-shadow: 0 0 8px rgba(255, 216, 74, .7); }
+    .progress { display: flex; flex-direction: column; gap: 5px; }
+    .progress-label { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--muted); }
+    .progress-label b { color: var(--text); }
+    .track { height: 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+    .track > div { height: 100%; border-radius: 8px; background: linear-gradient(90deg, var(--c), #fff); box-shadow: 0 0 10px var(--c); }
+    .track.practice { height: 4px; }
+    .track.practice > div { background: #8fd3ff; box-shadow: none; }
+    .card-buttons { display: flex; gap: 8px; margin-top: auto; padding-top: 4px; }
+    .card-buttons .btn-go { height: 48px; font-size: 17px; border-radius: 14px; }
+    .btn-practice {
+      flex: none; width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+      background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); color: #8fd3ff;
+      transition: background .15s;
+    }
+    .btn-practice:hover { background: rgba(143, 211, 255, 0.18); }
+    .btn-practice svg.i { width: 22px; height: 22px; }
 
-    .settings { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; justify-content: space-between; margin-top: 18px; }
-    .swatches { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .menu-bottom {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; margin-top: 16px;
+      padding: 12px 16px; border-radius: 18px; background: rgba(14, 18, 48, 0.5); border: 1px solid var(--line);
+    }
+    .skin { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; font-weight: 800; color: var(--muted); }
     .swatch {
-      width: 34px; height: 34px; border-radius: 8px; border: 3px solid transparent; padding: 0;
-      box-shadow: inset 0 0 0 6px rgba(0,0,0,0.25);
+      width: 32px; height: 32px; border-radius: 9px; border: 2px solid transparent; transition: transform .1s;
     }
-    .swatch.active { border-color: #fff; transform: scale(1.1); }
-    .help { color: var(--muted); font-size: 14px; margin-top: 14px; text-align: center; line-height: 1.5; }
-    kbd { background: rgba(255,255,255,0.15); border-radius: 5px; padding: 1px 6px; font-family: inherit; }
+    .swatch:hover { transform: scale(1.08); }
+    .swatch.active { border-color: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25), 0 0 14px rgba(255, 255, 255, 0.4); }
+    .controls { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
 
-    .hud { position: fixed; top: 10px; right: 10px; z-index: 5; display: flex; gap: 8px; }
-    .hud-btn {
-      width: 46px; height: 46px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.3);
-      background: rgba(0,0,0,0.35); font-size: 20px; font-weight: 900; display: flex; align-items: center; justify-content: center;
-    }
+    /* ---------- HUD ---------- */
+    .hud { position: fixed; top: 12px; right: 12px; z-index: 5; display: flex; gap: 8px; }
     .practice-bar { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; gap: 10px; }
-    .practice-bar .hud-btn { width: auto; padding: 0 14px; font-size: 15px; }
-
-    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0; text-align: left; }
-    .stats div { background: rgba(255,255,255,0.08); border-radius: 10px; padding: 8px 12px; }
-    .stats b { display: block; font-size: 22px; }
-    .stack { display: flex; flex-direction: column; gap: 10px; }
-
-    .overlay { touch-action: pan-y; }
-    @media (max-height: 520px) {
-      .panel { padding: 14px 16px; }
-      h1.logo { font-size: 40px; }
-      .tagline { margin: 4px 0 10px; font-size: 14px; }
-      .levels { grid-template-columns: repeat(3, 1fr); gap: 10px; }
-      .level { min-height: 0; padding: 10px 12px; gap: 6px; }
-      .level h3 { font-size: 18px; }
-      .btn { padding: 9px 12px; font-size: 15px; }
-      .settings { margin-top: 10px; }
-      .help { display: none; }
-      .stats { margin: 10px 0; }
-      .stats b { font-size: 18px; }
+    .pill-btn {
+      display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 999px;
+      font-size: 14px; font-weight: 800; background: rgba(10, 14, 40, 0.6); border: 2px solid rgba(255, 255, 255, 0.4);
+      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
     }
-    @media (max-height: 520px) and (max-width: 640px) { .levels { grid-template-columns: 1fr; } }
+    .pill-btn svg.i { color: #7dff9a; }
+    .pill-btn.del svg.i { color: #ff8a8a; }
+    .pill-btn:active { transform: scale(.95); }
 
+    /* ---------- Hochformat-Hinweis ---------- */
     #rotate { z-index: 50; background: var(--bg); flex-direction: column; text-align: center; gap: 12px; font-size: 18px; }
     #rotate .phone { font-size: 56px; animation: tilt 1.6s ease-in-out infinite; }
     @keyframes tilt { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
     @media (orientation: portrait) and (max-width: 700px) { #rotate.show-if-portrait { display: flex !important; } }
+
+    /* ---------- kleine / niedrige Bildschirme ---------- */
+    @media (max-width: 760px) { .levels { gap: 10px; } .card h3 { font-size: 18px; } }
+    @media (max-height: 560px) {
+      .overlay { padding: 10px; }
+      .menu-top { margin-bottom: 10px; }
+      h1.logo { font-size: 38px; }
+      .tagline, .controls { display: none; }
+      .card-art { height: 64px; }
+      .card-body { padding: 10px 12px 12px; gap: 7px; }
+      .card h3 { font-size: 17px; }
+      .card-buttons .btn-go, .btn-practice { height: 40px; }
+      .btn-practice { width: 40px; }
+      .menu-bottom { margin-top: 10px; padding: 8px 12px; }
+      .panel { padding: 18px 18px 16px; }
+      .title { font-size: 26px; }
+      .pause-head { margin-bottom: 12px; }
+      .ring { width: 64px; height: 64px; }
+      .ring::after { inset: 6px; }
+      .btn-go { height: 48px; }
+      .tile { min-height: 60px; }
+      .win-coins { margin: 10px 0; }
+      .coin { width: 36px; height: 36px; }
+      .coin.got::after { inset: 8px; }
+      .hint { display: none; }
+    }
+    @media (max-height: 560px) and (max-width: 600px) { .levels { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
+  <!-- Icons -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4.5" height="16" rx="1.5"/><rect x="13.5" y="4" width="4.5" height="16" rx="1.5"/></symbol>
+    <symbol id="i-restart" viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 1-7.6 5.5 1.2 1.2 0 1 1 2.3.8A5.6 5.6 0 1 0 12 6.4h-1.3l1.6 1.6a1.2 1.2 0 0 1-1.7 1.7L6.9 6a1.2 1.2 0 0 1 0-1.7L10.6.6a1.2 1.2 0 0 1 1.7 1.7L10.7 4H12z"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 2.8a1.2 1.2 0 0 1 1.2 1.2v.3c3-1.6 5.6.9 8.6-.4 1.1-.5 2.4.3 2.4 1.5v7.4c0 .6-.3 1.1-.8 1.3-3.6 1.7-6.6-1.1-10.2.6V21a1.2 1.2 0 1 1-2.4 0V4A1.2 1.2 0 0 1 5 2.8z"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M11.3 2.7a1 1 0 0 1 1.4 0l8.6 8.2c.6.6.2 1.6-.7 1.6H19v7.3a1.2 1.2 0 0 1-1.2 1.2h-3.6v-5.5a1 1 0 0 0-1-1h-2.4a1 1 0 0 0-1 1V21H6.2A1.2 1.2 0 0 1 5 19.8v-7.3H3.4c-.9 0-1.3-1-.7-1.6l8.6-8.2z"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M4 5.3v13.4a1 1 0 0 0 1.6.8l9-6.7a1 1 0 0 0 0-1.6l-9-6.7a1 1 0 0 0-1.6.8zM17 5a1.5 1.5 0 0 1 3 0v14a1.5 1.5 0 0 1-3 0V5z"/></symbol>
+    <symbol id="i-sound" viewBox="0 0 24 24"><path d="M11 4.4v15.2a1 1 0 0 1-1.7.7L5.6 16H3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h2.6l3.7-4.3a1 1 0 0 1 1.7.7zM15.5 8.2a1.1 1.1 0 0 1 1.6 0 5.4 5.4 0 0 1 0 7.6 1.1 1.1 0 1 1-1.6-1.6 3.2 3.2 0 0 0 0-4.4 1.1 1.1 0 0 1 0-1.6zm3-3a1.1 1.1 0 0 1 1.6 0 9.6 9.6 0 0 1 0 13.6 1.1 1.1 0 1 1-1.6-1.6 7.4 7.4 0 0 0 0-10.4 1.1 1.1 0 0 1 0-1.6z"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 4.4v15.2a1 1 0 0 1-1.7.7L5.6 16H3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h2.6l3.7-4.3a1 1 0 0 1 1.7.7zM15.3 8.8a1.1 1.1 0 0 1 1.6 0l1.6 1.6 1.6-1.6a1.1 1.1 0 1 1 1.6 1.6L20.1 12l1.6 1.6a1.1 1.1 0 1 1-1.6 1.6l-1.6-1.6-1.6 1.6a1.1 1.1 0 1 1-1.6-1.6l1.6-1.6-1.6-1.6a1.1 1.1 0 0 1 0-1.6z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M9.5 16.2 5.3 12a1.2 1.2 0 1 0-1.7 1.7l5 5a1.2 1.2 0 0 0 1.7 0l10.1-10a1.2 1.2 0 1 0-1.7-1.8l-9.2 9.3z"/></symbol>
+    <symbol id="i-diamond" viewBox="0 0 24 24"><path d="M12 2.5 21.5 12 12 21.5 2.5 12z"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.3 4.6 12 10.3l5.7-5.7a1.2 1.2 0 1 1 1.7 1.7L13.7 12l5.7 5.7a1.2 1.2 0 1 1-1.7 1.7L12 13.7l-5.7 5.7a1.2 1.2 0 1 1-1.7-1.7l5.7-5.7-5.7-5.7a1.2 1.2 0 0 1 1.7-1.7z"/></symbol>
+    <symbol id="i-retry" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2z"/></symbol>
+    <symbol id="i-jump" viewBox="0 0 24 24"><path d="M12 3.5a1 1 0 0 1 .7.3l6 6a1 1 0 0 1-.7 1.7h-3.5V19a1.5 1.5 0 0 1-1.5 1.5h-2A1.5 1.5 0 0 1 9.5 19v-7.5H6a1 1 0 0 1-.7-1.7l6-6a1 1 0 0 1 .7-.3z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2zm0 2a1.2 1.2 0 0 1 1.2 1.2v3.9l2.7 2.7a1.2 1.2 0 0 1-1.7 1.7l-3-3a1.2 1.2 0 0 1-.4-.9V7.6A1.2 1.2 0 0 1 12 6.4z"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 3h10a1 1 0 0 1 1 1v1h2.5a1 1 0 0 1 1 1v1.5a4.5 4.5 0 0 1-4.3 4.5A6 6 0 0 1 13.2 15v2.6h2.6a1.2 1.2 0 1 1 0 2.4H8.2a1.2 1.2 0 1 1 0-2.4h2.6V15a6 6 0 0 1-4-3A4.5 4.5 0 0 1 2.5 7.5V6a1 1 0 0 1 1-1H6V4a1 1 0 0 1 1-1zM4.7 7.2v.3a2.3 2.3 0 0 0 1.4 2.1A6 6 0 0 1 6 8.5V7.2H4.7zm14.6 0H18v1.3l-.1 1.1a2.3 2.3 0 0 0 1.4-2.1v-.3z"/></symbol>
+  </svg>
+
   <canvas id="game"></canvas>
 
   <!-- Hauptmenü -->
   <div id="menu" class="overlay dim">
-    <div class="panel">
-      <h1 class="logo">NEON HOP</h1>
-      <p class="tagline">Spring im Takt, flieg durch Tunnel, dreh die Schwerkraft um.</p>
-      <div id="levels" class="levels"></div>
-      <div class="settings">
-        <div class="swatches" id="swatches" aria-label="Farbe wählen"><span>Farbe:</span></div>
-        <button class="btn ghost" id="soundBtn">🔊 Ton an</button>
+    <div class="menu-wrap">
+      <div class="menu-top">
+        <div class="logo-block">
+          <h1 class="logo">NEON HOP</h1>
+          <p class="tagline">Spring im Takt, flieg durch Tunnel, dreh die Schwerkraft um.</p>
+        </div>
+        <div class="menu-actions">
+          <button class="icon-btn" id="soundBtn" aria-label="Ton an/aus"><svg class="i"><use href="#i-sound"/></svg></button>
+        </div>
       </div>
-      <p class="help">
-        Springen: <kbd>Leertaste</kbd> / <kbd>↑</kbd> / Klick / Tippen &nbsp;·&nbsp; Gedrückt halten = immer wieder springen
-        · Pause: <kbd>Esc</kbd>
-        <br>Übungsmodus: Checkpoints setzen mit <kbd>Z</kbd>, löschen mit <kbd>X</kbd>
-      </p>
+      <div id="levels" class="levels"></div>
+      <div class="menu-bottom">
+        <div class="skin" id="swatches"><span>Würfel</span></div>
+        <div class="controls">
+          <span><kbd>Leertaste</kbd> / Klick / Tippen: springen</span>
+          <span><kbd>Esc</kbd> Pause</span>
+          <span>Übung: <kbd>Z</kbd> Checkpoint, <kbd>X</kbd> löschen</span>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- Spiel-HUD -->
   <div id="hud" class="hud hidden">
-    <button class="hud-btn" id="pauseBtn" aria-label="Pause">II</button>
+    <button class="icon-btn" id="pauseBtn" aria-label="Pause"><svg class="i"><use href="#i-pause"/></svg></button>
   </div>
   <div id="practiceBar" class="practice-bar hidden">
-    <button class="hud-btn" id="cpAdd">◆ Checkpoint</button>
-    <button class="hud-btn" id="cpDel">✕ Löschen</button>
+    <button class="pill-btn" id="cpAdd"><svg class="i"><use href="#i-diamond"/></svg>Checkpoint</button>
+    <button class="pill-btn del" id="cpDel"><svg class="i"><use href="#i-x"/></svg>Löschen</button>
   </div>
 
   <!-- Pause -->
   <div id="pause" class="overlay dim hidden">
-    <div class="panel small">
-      <h2>Pause</h2>
-      <p id="pauseInfo" style="color: var(--muted)"></p>
-      <div class="stack">
-        <button class="btn primary" id="resumeBtn">Weiter</button>
-        <button class="btn" id="restartBtn">Neu starten</button>
-        <button class="btn" id="togglePracticeBtn">Übungsmodus</button>
-        <button class="btn ghost" id="menuBtn">Zum Menü</button>
+    <div class="panel">
+      <div class="pause-head">
+        <div class="ring" id="pauseRing"><span id="pausePct">0%</span></div>
+        <div>
+          <div class="eyebrow">Pause</div>
+          <div class="title" id="pauseLevel">Level</div>
+          <div class="chips">
+            <span class="chip"><svg class="i"><use href="#i-retry"/></svg><span id="pauseAttempt">Versuch 1</span></span>
+            <span class="chip"><svg class="i"><use href="#i-trophy"/></svg><span id="pauseBest">Bestwert 0%</span></span>
+            <span class="chip practice hidden" id="pausePractice">Übungsmodus</span>
+          </div>
+        </div>
       </div>
+      <button class="btn-go" id="resumeBtn"><svg class="i"><use href="#i-play"/></svg>Weiter</button>
+      <div class="tiles">
+        <button class="tile" id="restartBtn"><svg class="i"><use href="#i-restart"/></svg>Neu starten</button>
+        <button class="tile" id="togglePracticeBtn"><svg class="i"><use href="#i-flag"/></svg><span>Übungsmodus</span></button>
+        <button class="tile" id="menuBtn"><svg class="i"><use href="#i-home"/></svg>Menü</button>
+      </div>
+      <div class="hint"><kbd>Esc</kbd> weiter · <kbd>R</kbd> neu starten</div>
     </div>
   </div>
 
   <!-- Geschafft -->
   <div id="win" class="overlay dim hidden">
-    <div class="panel small">
-      <h2 id="winTitle">Level geschafft!</h2>
-      <div class="coins" id="winCoins" style="font-size: 34px"></div>
+    <div class="panel">
+      <div class="eyebrow" id="winLevel">Level</div>
+      <div class="title" id="winTitle">Level geschafft!</div>
+      <div class="win-coins" id="winCoins"></div>
       <div class="stats">
-        <div>Versuche<b id="winAttempts">1</b></div>
-        <div>Sprünge<b id="winJumps">0</b></div>
-        <div>Zeit<b id="winTime">0s</b></div>
-        <div>Modus<b id="winMode">Normal</b></div>
+        <div class="stat"><svg class="i"><use href="#i-retry"/></svg><b id="winAttempts">1</b><small>Versuche</small></div>
+        <div class="stat"><svg class="i"><use href="#i-jump"/></svg><b id="winJumps">0</b><small>Sprünge</small></div>
+        <div class="stat"><svg class="i"><use href="#i-clock"/></svg><b id="winTime">0s</b><small>Zeit</small></div>
       </div>
-      <div class="stack">
-        <button class="btn primary" id="nextBtn">Nächstes Level</button>
-        <button class="btn" id="againBtn">Nochmal</button>
-        <button class="btn ghost" id="winMenuBtn">Zum Menü</button>
+      <button class="btn-go" id="nextBtn"><svg class="i"><use href="#i-next"/></svg><span id="nextLabel">Nächstes Level</span></button>
+      <div class="tiles" style="grid-template-columns: 1fr 1fr">
+        <button class="tile" id="againBtn"><svg class="i"><use href="#i-restart"/></svg>Nochmal</button>
+        <button class="tile" id="winMenuBtn"><svg class="i"><use href="#i-home"/></svg>Menü</button>
       </div>
     </div>
   </div>
