@@ -1,0 +1,29 @@
+{
+  "title": "Neon Hop",
+  "slug": "neon-hop",
+  "description": "A rhythm runner full of neon. Your cube runs by itself: jump at the right moment, fly your rocket through tunnels and flip gravity. 15 levels from easy to extreme, 3 coins per level, a practice mode with checkpoints and music made live in the browser. Race up to 3 friends in the same level: you see each other as ghosts and nobody gets in anyone's way. Create a room and share the 5-character code.",
+  "description_de": "Ein Rhythmus-Runner voller Neon. Dein Würfel läuft von selbst: Spring im richtigen Moment, flieg mit der Rakete durch Tunnel und dreh die Schwerkraft um. 15 Level von leicht bis extrem, 3 Münzen pro Level, Übungsmodus mit Checkpoints und Musik, die live im Browser entsteht. Mit bis zu 3 Freunden im selben Level um die Wette: Ihr seht euch als Geister und könnt euch nicht stören. Raum erstellen und den 5-stelligen Code teilen.",
+  "controls": "Space / Up / W, click or tap: jump (hold to keep jumping, rocket: hold to fly up). Esc: pause. R: restart. Practice: Z place checkpoint, X remove it. Menu: scroll with swipe, mouse wheel or arrow keys.",
+  "category": "other",
+  "engine": "HTML/JavaScript (Canvas, Web Audio)",
+  "version": "1.0",
+  "update_title": "Neon Hop ist da",
+  "notes": [
+    "15 Level in vier Stufen: Leicht, Mittel, Schwer und Extrem",
+    "Würfel, Rakete, Sprungfelder, Ringe und Schwerkraft-Portale",
+    "Mehrspieler-Rennen für bis zu 4 Spieler mit Raumcode",
+    "Übungsmodus mit Checkpoints und eigene Musik für jedes Level"
+  ],
+  "cover_image": "assets/promo/Neon-Hop-Titelbild.png",
+  "screenshots": [
+    "assets/promo/Screenshot-1-Menue.png",
+    "assets/promo/Screenshot-2-Sprung.png",
+    "assets/promo/Screenshot-3-Rakete.png",
+    "assets/promo/Screenshot-4-Schwerkraft.png"
+  ],
+  "multiplayer": true,
+  "max_players": 4,
+  "join_param": "room",
+  "score_order": "high",
+  "score_format": "points"
+}

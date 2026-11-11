@@ -36,6 +36,16 @@
     const cfg = root.NEONHOP_CONFIG || {};
     return String(root.NEONHOP_SERVER || cfg.server || '').trim();
   }
+  /** Kostenlose Hoster legen den Server schlafen: früh anklopfen, damit er wach ist, wenn man klickt. */
+  let lastWake = 0;
+  function wake() {
+    const url = serverUrl();
+    if (!url || !root.fetch || Date.now() - lastWake < 60000) return;
+    lastWake = Date.now();
+    const http = url.replace(/^ws(s?):\/\//, 'http$1://').replace(/\/+$/, '') + '/health';
+    try { root.fetch(http, { mode: 'no-cors', cache: 'no-store' }).catch(() => {}); } catch (e) { /* egal */ }
+  }
+
   function cleanCode(c) {
     return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LEN);
   }
@@ -175,7 +185,7 @@
   }
 
   root.Net = {
-    host, join, send, sendTo, kick, leave, on, cleanCode,
+    host, join, send, sendTo, kick, leave, on, cleanCode, wake,
     CODE_LEN,
     get isHost() { return isHost; },
     get code() { return code; },

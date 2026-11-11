@@ -128,7 +128,7 @@ function connect(port, origin) {
 
   // Herkunfts-Sperre
   const port2 = 18788;
-  const srv2 = await startServer(port2, { ALLOWED_ORIGINS: 'https://toki.example' });
+  const srv2 = await startServer(port2, { ALLOWED_ORIGINS: 'https://toki.example,https://*.playtoki.app' });
   try {
     let blocked = false;
     try { await connect(port2, 'https://boese.example'); } catch (e) { blocked = true; }
@@ -136,6 +136,15 @@ function connect(port, origin) {
     const allowed = await connect(port2, 'https://toki.example');
     ok(allowed.readyState === 1, 'erlaubte Seite kommt rein');
     allowed.close();
+    const sub = await connect(port2, 'https://neon-hop.playtoki.app');
+    ok(sub.readyState === 1, 'Platzhalter: https://neon-hop.playtoki.app erlaubt');
+    sub.close();
+    let fake = false;
+    try { await connect(port2, 'https://neon-hop.playtoki.app.boese.example'); } catch (e) { fake = true; }
+    ok(fake, 'Platzhalter lässt keine nachgemachte Domain durch');
+    let bare = false;
+    try { await connect(port2, 'https://playtoki.app'); } catch (e) { bare = true; }
+    ok(bare, 'nicht eingetragene Hauptdomain bleibt gesperrt');
   } finally {
     srv2.kill();
   }

@@ -10,7 +10,7 @@ services:
     startCommand: npm start
     healthCheckPath: /health
     envVars:
-      # Komma-Liste der Seiten, von denen aus gespielt werden darf (leer = alle).
-      # Render fragt beim Einrichten danach.
+      # Komma-Liste der Seiten, von denen aus gespielt werden darf ("*" = ein Namensteil).
+      # Toki-Spiele laufen unter <slug>.playtoki.app.
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: https://*.playtoki.app,https://playtoki.app,https://toki-ashy.vercel.app

@@ -22,3 +22,6 @@
   Render (`render.yaml`) oder `server/Dockerfile`; Vercel kann keine WebSockets.
   Nachrichten von Mitspielern sind nicht vertrauenswürdig: immer prüfen und nur per
   `textContent` anzeigen. Raumcode an Toki über `window.toki.room(code)`.
+- Toki: Spiel wird über `toki.json` (Repo-Wurzel) beschrieben; Toki-Skript v6 im `<head>`
+  (`toki.score`, `toki.room`, `toki.onHost`, `toki.onName`). Gleicher Aufbau wie im Repo
+  `DasLeon08/Scam_with_your_bros`, das ebenfalls einen eigenen Render-Server nutzt.

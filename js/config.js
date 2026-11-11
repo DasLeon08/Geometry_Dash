@@ -7,5 +7,5 @@
  *         Leer lassen = Mehrspieler zeigt "noch nicht eingerichtet".
  */
 window.NEONHOP_CONFIG = Object.assign({
-  server: '',
+  server: 'wss://neonhop-server.onrender.com',
 }, window.NEONHOP_CONFIG || {});

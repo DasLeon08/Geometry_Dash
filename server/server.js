@@ -9,8 +9,8 @@
  * Umgebungsvariablen:
  *   PORT             Port (setzen Hoster wie Render automatisch)
  *   HOST             Adresse zum Lauschen (Standard 0.0.0.0)
- *   ALLOWED_ORIGINS  Komma-Liste erlaubter Seiten, z.B.
- *                    "https://toki-ashy.vercel.app,https://deine-spiele-domain.app"
+ *   ALLOWED_ORIGINS  Komma-Liste erlaubter Seiten, "*" für einen Namensteil, z.B.
+ *                    "https://*.playtoki.app,https://playtoki.app,https://toki-ashy.vercel.app"
  *                    Leer = alle Seiten erlaubt.
  *
  * Protokoll (JSON über WebSocket):
@@ -31,7 +31,10 @@ const { WebSocketServer } = require('ws');
 const PORT = Number(process.env.PORT) || 8787;
 const HOST = process.env.HOST || '0.0.0.0';
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
-  .split(',').map((s) => s.trim().replace(/\/$/, '')).filter(Boolean);
+  .split(',').map((s) => s.trim().replace(/\/$/, '').toLowerCase()).filter(Boolean);
+// "*" steht für genau einen Teil des Namens: https://*.playtoki.app erlaubt https://neon-hop.playtoki.app
+const ORIGIN_PATTERNS = ALLOWED_ORIGINS.map((o) =>
+  new RegExp('^' + o.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[a-z0-9-]+') + '$'));
 
 const MAX_PLAYERS = 4;          // Host + 3 Gäste
 const MAX_ROOMS = 5000;
@@ -57,8 +60,9 @@ function send(client, obj) {
 }
 
 function originAllowed(origin) {
-  if (!ALLOWED_ORIGINS.length) return true;
-  return ALLOWED_ORIGINS.includes(String(origin || '').replace(/\/$/, ''));
+  if (!ORIGIN_PATTERNS.length) return true;
+  const o = String(origin || '').replace(/\/$/, '').toLowerCase();
+  return ORIGIN_PATTERNS.some((re) => re.test(o));
 }
 
 const server = http.createServer((req, res) => {

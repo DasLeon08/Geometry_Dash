@@ -40,7 +40,8 @@
     if (!raw || typeof raw !== 'object') return data;
     data.color = clampInt(raw.color, PLAYER_COLORS.length - 1);
     data.muted = raw.muted === true;
-    data.name = typeof raw.name === 'string' ? raw.name.replace(/[\u0000-\u001f<>]/g, '').slice(0, 12) : '';
+    data.name = typeof raw.name === 'string' ? raw.name.replace(/[\u0000-\u001f<>]/g, '').slice(0, 16) : '';
+    data.nameTyped = raw.nameTyped === true;
     const levels = raw.levels && typeof raw.levels === 'object' ? raw.levels : {};
     window.LEVELS.forEach((def) => {
       const l = levels[def.id];
@@ -488,7 +489,7 @@
   };
 
   function cleanName(n) {
-    return String(n || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 12) || 'Spieler';
+    return String(n || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 16) || 'Spieler';
   }
   function num(v, lo, hi) {
     v = Number(v);
@@ -523,6 +524,7 @@
   // ----- Fenster ---------------------------------------------------------
   function openMp() {
     A.unlock();
+    N.wake();
     if (!$('mpName').value) $('mpName').value = save.name || ('Spieler ' + (10 + Math.floor(Math.random() * 90)));
     if (!mp.inRoom) mpStatus('');
     renderLobby();
@@ -811,6 +813,37 @@
   $('mpCreate').onclick = mpCreate;
   $('mpJoin').onclick = () => mpJoinCode($('mpCode').value);
   $('mpCode').addEventListener('input', () => { $('mpCode').value = N.cleanCode($('mpCode').value); });
+  // Wer seinen Namen selbst eintippt, behält ihn (sonst kommt er von Toki)
+  $('mpName').addEventListener('input', () => { save.nameTyped = true; writeSave(); });
+
+  // ----- Toki-Anbindung -----------------------------------------------------
+  (function tokiHooks() {
+    const t = window.toki;
+    if (!t) return;
+    // Toki-Name automatisch übernehmen, solange man keinen eigenen eingetippt hat
+    try {
+      if (typeof t.onName === 'function') {
+        t.onName((name) => {
+          if (save.nameTyped) return;
+          const n = cleanName(name);
+          save.name = n;
+          writeSave();
+          $('mpName').value = n;
+        });
+      }
+    } catch (e) { /* egal */ }
+    // "Freunde einladen" in Toki, bevor ein Raum offen ist: gleich einen Raum öffnen
+    try {
+      if (typeof t.onHost === 'function') {
+        t.onHost(() => {
+          if (mp.inRoom) { if (game.scene !== 'play') openMp(); return; }
+          if (game.scene !== 'menu') goMenu();
+          openMp();
+          mpCreate();
+        });
+      }
+    } catch (e) { /* egal */ }
+  })();
   $('mpLeave').onclick = () => { leaveRoom(); show('mp', true); };
   $('mpStart2').onclick = hostStartRace;
   $('mpCopy').onclick = () => {
@@ -1561,6 +1594,7 @@
 
   buildMenu();
   A.playMenuMusic();   // startet hörbar beim ersten Klick / Tastendruck
+  N.wake();            // schlafenden Mehrspieler-Server schon mal wecken
   requestAnimationFrame(frame);
 
   // für Tests / Einbettung

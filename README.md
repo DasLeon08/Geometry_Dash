@@ -50,7 +50,13 @@ Dann <http://localhost:8000> öffnen.
 
 ## Auf Toki hochladen
 
-Das Spiel ist ein statischer Ordner. Hochzuladen sind:
+Am einfachsten auf Toki **Spiel hinzufügen → Von GitHub** wählen, dieses Repository
+und den Branch angeben. Alle Angaben für den Eintrag stehen in [`toki.json`](toki.json):
+Titel, Beschreibung DE/EN, Steuerung, Cover, Screenshots, Mehrspieler (max. 4,
+Einladungscode über `?room=`), Highscore und Version. Für ein Update `version`
+erhöhen, `notes` schreiben und pushen.
+
+Von Hand hochladen geht auch. Das Spiel ist ein statischer Ordner, hochzuladen sind:
 
 ```
 index.html
@@ -93,6 +99,14 @@ Im Menü auf **Mehrspieler** tippen, Namen eingeben und einen Raum erstellen. De
 mit dem Code bei, oder über einen Link mit `?room=CODE` (bzw. `#room=CODE`).
 Von aussen geht auch `NeonHop.joinRoom('CODE')`.
 
+Toki-Anbindung (Toki-Skript v6 im `<head>`):
+
+- `toki.room(code)` im Raum, `toki.room(null)` beim Verlassen: Toki zeigt „Freunde einladen“.
+- `toki.onHost`: Wer auf Toki „Freunde einladen“ drückt, bevor ein Raum offen ist, bekommt sofort einen Raum.
+- `toki.onName`: Der Toki-Name steht automatisch im Namensfeld, bis man selbst etwas eintippt.
+- Beim Start und beim Öffnen des Mehrspieler-Fensters wird der Server schon geweckt
+  (der Gratis-Plan von Render schläft sonst).
+
 - Bis zu 4 Spieler. Der Host wählt das Level und startet. Es gibt einen Countdown 3-2-1-LOS.
 - Alle spielen dasselbe Level gleichzeitig. Die anderen sieht man als halb
   durchsichtige Geister mit Namen, man kann sich also nicht stören. Auf dem
@@ -117,15 +131,14 @@ deshalb einen eigenen Hoster.
 1. Auf [render.com](https://render.com) mit GitHub anmelden.
 2. **New + → Blueprint** wählen und dieses Repository auswählen. Render liest
    `render.yaml` und legt den Dienst `neonhop-server` an.
-3. Bei `ALLOWED_ORIGINS` die Adresse(n) eintragen, unter denen das Spiel läuft,
-   z.B. `https://toki-ashy.vercel.app` (mehrere mit Komma). Leer lassen erlaubt alle Seiten.
+3. `ALLOWED_ORIGINS` ist in `render.yaml` schon gesetzt: Toki-Seiten
+   (`https://*.playtoki.app`, `https://playtoki.app`, `https://toki-ashy.vercel.app`).
+   `*` steht für einen Namensteil. Weitere Seiten mit Komma anhängen.
 4. Nach dem Deploy steht oben die Adresse, z.B. `https://neonhop-server.onrender.com`.
    Unter `/health` muss „Neon Hop Mehrspieler-Server läuft“ stehen.
-5. In [`js/config.js`](js/config.js) eintragen, mit `wss://` statt `https://`:
-
-   ```js
-   server: 'wss://neonhop-server.onrender.com',
-   ```
+5. In [`js/config.js`](js/config.js) ist `wss://neonhop-server.onrender.com` schon
+   eingetragen. Falls Render eine andere Adresse vergibt, dort ändern (mit `wss://`
+   statt `https://`) und pushen.
 
 Hinweis zum Gratis-Plan von Render: Der Server schläft nach ca. 15 Minuten ohne
 Spieler ein. Der erste Raum danach braucht bis zu einer Minute, das Spiel zeigt
