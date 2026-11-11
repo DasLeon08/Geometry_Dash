@@ -1,0 +1,16 @@
+# Render-Blueprint für den Neon Hop Mehrspieler-Server.
+# Auf render.com: "New +" → "Blueprint" → dieses GitHub-Repo wählen.
+services:
+  - type: web
+    name: neonhop-server
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      # Komma-Liste der Seiten, von denen aus gespielt werden darf (leer = alle).
+      # Render fragt beim Einrichten danach.
+      - key: ALLOWED_ORIGINS
+        sync: false

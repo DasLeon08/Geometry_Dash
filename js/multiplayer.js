@@ -1,128 +1,146 @@
 /*
  * Neon Hop – Mehrspieler-Verbindung.
  *
- * Die Spieler verbinden sich direkt miteinander (WebRTC über PeerJS).
- * Ein Vermittlungs-Server wird nur für den Verbindungsaufbau gebraucht;
- * standardmässig der öffentliche PeerJS-Server. Einen eigenen Server kann man
- * vor dem Laden des Spiels einstellen:
- *   window.NEONHOP_PEER = { host: 'mein-server.example', port: 443, path: '/', secure: true };
+ * Alle Spieler verbinden sich per WebSocket mit dem eigenen Mehrspieler-Server
+ * (Ordner server/). Der Server verwaltet die Räume und leitet Nachrichten
+ * weiter – es gibt keine direkten Verbindungen zwischen den Geräten, darum
+ * funktioniert es auch im Handy-Netz.
  *
- * Aufbau: Der Host hat die Peer-ID "neonhop-v1-<CODE>", alle anderen verbinden
- * sich mit ihm (Stern). Der Host leitet Nachrichten an alle weiter.
+ * Die Adresse des Servers steht in js/config.js (NEONHOP_CONFIG.server).
  */
 (function (root) {
   'use strict';
 
-  const PREFIX = 'neonhop-v1-';
-  const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // ohne 0/O und 1/I
   const CODE_LEN = 5;
-  const MAX_GUESTS = 3;                                   // + Host = 4 Spieler
+  const CONNECT_TIMEOUT = 45000;   // kostenlose Hoster brauchen beim Aufwachen etwas länger
+  const SLOW_AFTER = 4000;
+  const ERRORS = {
+    'not-found': 'Raum nicht gefunden. Stimmt der Code?',
+    full: 'Der Raum ist voll (max. 4 Spieler).',
+    busy: 'Der Server ist gerade voll. Bitte später nochmal versuchen.',
+  };
+  const NO_CONNECTION = 'Keine Verbindung zum Mehrspieler-Server. Bitte Internet prüfen.';
 
-  let peer = null;
+  let ws = null;
   let isHost = false;
   let code = null;
-  let hostConn = null;
-  const guests = new Map();   // Peer-ID -> Verbindung (nur beim Host)
+  let myId = null;
+  let pending = null;          // wartet auf 'hosted' / 'joined'
+  let pingTimer = null;
   const handlers = {};
 
   function on(event, fn) { handlers[event] = fn; }
   function emit(event, data) { if (handlers[event]) handlers[event](data); }
 
-  function loadLibrary() {
-    return new Promise((resolve, reject) => {
-      if (root.Peer) { resolve(); return; }
-      const s = document.createElement('script');
-      s.src = 'js/vendor/peerjs.min.js';
-      s.onload = () => (root.Peer ? resolve() : reject(new Error('Mehrspieler konnte nicht geladen werden.')));
-      s.onerror = () => reject(new Error('Mehrspieler konnte nicht geladen werden.'));
-      document.head.appendChild(s);
-    });
+  function serverUrl() {
+    const cfg = root.NEONHOP_CONFIG || {};
+    return String(root.NEONHOP_SERVER || cfg.server || '').trim();
+  }
+  function cleanCode(c) {
+    return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LEN);
   }
 
-  function friendlyError(e) {
-    const t = e && e.type;
-    if (t === 'peer-unavailable') return 'Raum nicht gefunden. Stimmt der Code?';
-    if (t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') {
-      return 'Keine Verbindung zum Mehrspieler-Server. Bitte Internet prüfen.';
-    }
-    if (t === 'browser-incompatible') return 'Dein Browser unterstützt keinen Mehrspieler.';
-    return (e && e.message) || 'Verbindung fehlgeschlagen.';
-  }
-
-  function openPeer(id) {
+  function connect() {
     return new Promise((resolve, reject) => {
-      const opts = Object.assign({ debug: 0 }, root.NEONHOP_PEER || {});
-      const p = id ? new root.Peer(id, opts) : new root.Peer(opts);
+      const url = serverUrl();
+      if (!url) { reject(new Error('Der Mehrspieler-Server ist noch nicht eingerichtet.')); return; }
+      let s;
+      try { s = new WebSocket(url); } catch (e) { reject(new Error('Die Adresse des Mehrspieler-Servers ist ungültig.')); return; }
       let settled = false;
+      const slow = setTimeout(() => { if (!settled) emit('slow'); }, SLOW_AFTER);
       const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
-        p.destroy();
-        reject({ type: 'network' });
-      }, 12000);
-      p.on('open', () => {
+        clearTimeout(slow);
+        try { s.close(); } catch (e) { /* egal */ }
+        reject(new Error(NO_CONNECTION));
+      }, CONNECT_TIMEOUT);
+      s.onopen = () => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
-        resolve(p);
-      });
-      p.on('error', (e) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timer);
-          p.destroy();
-          reject(e);
-          return;
-        }
-        if (e.type === 'peer-unavailable') emit('joinFailed', friendlyError(e));
-      });
-      p.on('disconnected', () => {
-        // Verbindung zum Vermittlungs-Server weg: bestehende Spieler-Verbindungen laufen weiter
-        if (peer === p && !p.destroyed) { try { p.reconnect(); } catch (err) { /* egal */ } }
-      });
+        clearTimeout(timer); clearTimeout(slow);
+        resolve(s);
+      };
+      s.onerror = () => { /* close folgt */ };
+      s.onclose = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer); clearTimeout(slow);
+        reject(new Error(NO_CONNECTION));
+      };
     });
   }
 
-  function randomCode() {
-    let c = '';
-    const buf = new Uint32Array(CODE_LEN);
-    (root.crypto || root.msCrypto).getRandomValues(buf);
-    for (let i = 0; i < CODE_LEN; i++) c += ALPHABET[buf[i] % ALPHABET.length];
-    return c;
+  function attach(s) {
+    ws = s;
+    s.onmessage = (ev) => {
+      let m;
+      try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m && typeof m === 'object') onServer(m);
+    };
+    s.onclose = () => {
+      if (ws !== s) return;            // absichtlich getrennt (leave)
+      const wasHost = isHost;
+      const waiting = pending;
+      reset();
+      if (waiting) { waiting.reject(new Error(NO_CONNECTION)); return; }
+      emit(wasHost ? 'disconnected' : 'hostLeft', { lost: true });
+    };
+    clearInterval(pingTimer);
+    pingTimer = setInterval(() => raw({ op: 'ping' }), 20000);   // hält die Verbindung wach
   }
 
-  function cleanCode(c) {
-    return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LEN);
+  function onServer(m) {
+    if (pending && (m.op === pending.ok || m.op === 'error')) {
+      const p = pending;
+      pending = null;
+      clearTimeout(p.timer);
+      if (m.op === 'error') p.reject(new Error(ERRORS[m.reason] || 'Verbindung fehlgeschlagen.'));
+      else p.resolve(m);
+      return;
+    }
+    switch (m.op) {
+      case 'guest-joined': emit('guestJoined', String(m.id)); break;
+      case 'guest-left': emit('guestLeft', String(m.id)); break;
+      case 'msg': emit('message', { from: isHost ? String(m.from) : 'host', msg: m.data }); break;
+      case 'host-left': emit('hostLeft'); break;
+      default:
+    }
+  }
+
+  function request(obj, ok) {
+    return new Promise((resolve, reject) => {
+      pending = {
+        ok, resolve, reject,
+        timer: setTimeout(() => { if (pending && pending.ok === ok) { pending = null; reject(new Error('Der Server antwortet nicht.')); } }, 10000),
+      };
+      raw(obj);
+    });
+  }
+
+  function raw(obj) {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+  }
+
+  function reset() {
+    clearInterval(pingTimer);
+    ws = null; isHost = false; code = null; myId = null; pending = null;
   }
 
   /** Raum erstellen. Gibt den Raumcode zurück. */
   async function host() {
     leave();
-    await loadLibrary();
-    for (let tries = 0; tries < 5; tries++) {
-      const c = randomCode();
-      try {
-        peer = await openPeer(PREFIX + c);
-      } catch (e) {
-        if (e && e.type === 'unavailable-id') continue;   // Code schon vergeben
-        throw new Error(friendlyError(e));
-      }
-      code = c;
+    attach(await connect());
+    try {
+      const r = await request({ op: 'host' }, 'hosted');
       isHost = true;
-      peer.on('connection', (conn) => {
-        if (guests.size >= MAX_GUESTS) {
-          // kurz warten, damit die Nachricht sicher ankommt, dann trennen
-          conn.on('open', () => { setTimeout(() => { if (conn.open) conn.send({ t: 'full' }); }, 250); setTimeout(() => conn.close(), 1500); });
-          return;
-        }
-        conn.on('open', () => { guests.set(conn.peer, conn); emit('guestJoined', conn.peer); });
-        conn.on('data', (msg) => emit('message', { from: conn.peer, msg }));
-        conn.on('close', () => { if (guests.delete(conn.peer)) emit('guestLeft', conn.peer); });
-        conn.on('error', () => { if (guests.delete(conn.peer)) emit('guestLeft', conn.peer); });
-      });
-      return c;
+      code = r.code;
+      myId = r.id;
+      return code;
+    } catch (e) {
+      leave();
+      throw e;
     }
-    throw new Error('Kein freier Raumcode gefunden. Bitte nochmal versuchen.');
   }
 
   /** Einem Raum beitreten. */
@@ -130,54 +148,30 @@
     leave();
     const c = cleanCode(rawCode);
     if (c.length !== CODE_LEN) throw new Error('Der Raumcode hat ' + CODE_LEN + ' Zeichen.');
-    await loadLibrary();
+    attach(await connect());
     try {
-      peer = await openPeer(null);
+      const r = await request({ op: 'join', code: c }, 'joined');
+      isHost = false;
+      code = c;
+      myId = r.id;
+      return c;
     } catch (e) {
-      throw new Error(friendlyError(e));
+      leave();
+      throw e;
     }
-    return new Promise((resolve, reject) => {
-      let done = false;
-      const fail = (text) => { if (done) return; done = true; leave(); reject(new Error(text)); };
-      const timer = setTimeout(() => fail('Raum nicht gefunden. Stimmt der Code?'), 12000);
-      on('joinFailed', (text) => { clearTimeout(timer); fail(text); });
-      const conn = peer.connect(PREFIX + c, { reliable: true, serialization: 'json' });
-      conn.on('open', () => {
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        hostConn = conn;
-        code = c;
-        isHost = false;
-        resolve(c);
-      });
-      conn.on('data', (msg) => emit('message', { from: 'host', msg }));
-      conn.on('close', () => { if (hostConn === conn) { hostConn = null; emit('hostLeft'); } });
-      conn.on('error', () => { if (hostConn === conn) { hostConn = null; emit('hostLeft'); } });
-    });
   }
 
-  /** Host: an alle (ausser except). Gast: an den Host. */
+  /** Host: an alle Gäste (ausser except). Gast: an den Host. */
   function send(msg, except) {
-    if (isHost) guests.forEach((conn, id) => { if (id !== except && conn.open) conn.send(msg); });
-    else if (hostConn && hostConn.open) hostConn.send(msg);
+    raw(isHost ? { op: 'send', data: msg, except } : { op: 'send', data: msg });
   }
-  function sendTo(id, msg) {
-    const conn = guests.get(id);
-    if (conn && conn.open) conn.send(msg);
-  }
-  function kick(id) {
-    const conn = guests.get(id);
-    if (conn) conn.close();
-  }
+  function sendTo(id, msg) { if (isHost) raw({ op: 'send', to: id, data: msg }); }
+  function kick(id) { if (isHost) raw({ op: 'kick', id }); }
 
   function leave() {
-    guests.forEach((conn) => { try { conn.close(); } catch (e) { /* egal */ } });
-    guests.clear();
-    if (hostConn) { const c = hostConn; hostConn = null; try { c.close(); } catch (e) { /* egal */ } }
-    if (peer) { const p = peer; peer = null; try { p.destroy(); } catch (e) { /* egal */ } }
-    isHost = false;
-    code = null;
+    const s = ws;
+    reset();
+    if (s) { try { s.close(1000); } catch (e) { /* egal */ } }
   }
 
   root.Net = {
@@ -185,7 +179,8 @@
     CODE_LEN,
     get isHost() { return isHost; },
     get code() { return code; },
-    get id() { return peer ? peer.id : null; },
-    get connected() { return !!peer && (isHost || !!hostConn); },
+    get id() { return myId; },
+    get connected() { return !!ws && ws.readyState === 1; },
+    get configured() { return !!serverUrl(); },
   };
 })(this);

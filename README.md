@@ -58,7 +58,7 @@ js/
 assets/
 ```
 
-`tools/`, `assets/promo/` und die `.md`-Dateien werden im Spiel nicht gebraucht.
+`tools/`, `server/`, `assets/promo/` und die `.md`-Dateien werden im Spiel nicht gebraucht.
 
 Bilder für die Toki-Spielseite liegen in `assets/promo/`:
 
@@ -103,19 +103,45 @@ Von aussen geht auch `NeonHop.joinRoom('CODE')`.
     weiterspielen oder in die Lobby gehen. Für die anderen läuft das Rennen weiter.
   - **Rennen endet**: Beim ersten Zieleinlauf geht es für alle mit der Rangliste in die Lobby.
 
-Technik: Die Spieler verbinden sich direkt (WebRTC, Bibliothek PeerJS in
-`js/vendor/`, MIT-Lizenz, wird erst beim Öffnen des Mehrspieler-Fensters geladen).
-Für den Verbindungsaufbau wird standardmässig der kostenlose öffentliche
-PeerJS-Server benutzt. Einen eigenen Server ([PeerServer](https://github.com/peers/peerjs-server))
-stellt man vor `js/multiplayer.js` ein:
+### Mehrspieler-Server
 
-```html
-<script>window.NEONHOP_PEER = { host: 'peer.example.com', port: 443, path: '/', secure: true };</script>
+Alle Spieler verbinden sich per WebSocket mit einem eigenen kleinen Server
+(Ordner `server/`), der die Räume verwaltet und die Nachrichten weiterleitet.
+Es gibt keine direkten Verbindungen zwischen den Geräten, darum funktioniert es
+in jedem Netz, auch im Handy-Netz. Auf Vercel selbst geht das nicht, weil dort
+keine dauerhaften WebSocket-Verbindungen möglich sind. Der Server braucht
+deshalb einen eigenen Hoster.
+
+**Einrichten auf Render.com (kostenlos):**
+
+1. Auf [render.com](https://render.com) mit GitHub anmelden.
+2. **New + → Blueprint** wählen und dieses Repository auswählen. Render liest
+   `render.yaml` und legt den Dienst `neonhop-server` an.
+3. Bei `ALLOWED_ORIGINS` die Adresse(n) eintragen, unter denen das Spiel läuft,
+   z.B. `https://toki-ashy.vercel.app` (mehrere mit Komma). Leer lassen erlaubt alle Seiten.
+4. Nach dem Deploy steht oben die Adresse, z.B. `https://neonhop-server.onrender.com`.
+   Unter `/health` muss „Neon Hop Mehrspieler-Server läuft“ stehen.
+5. In [`js/config.js`](js/config.js) eintragen, mit `wss://` statt `https://`:
+
+   ```js
+   server: 'wss://neonhop-server.onrender.com',
+   ```
+
+Hinweis zum Gratis-Plan von Render: Der Server schläft nach ca. 15 Minuten ohne
+Spieler ein. Der erste Raum danach braucht bis zu einer Minute, das Spiel zeigt
+solange „Der Mehrspieler-Server startet gerade …“. Mit einem bezahlten Plan oder
+einem anderen Hoster fällt das weg. Für andere Hoster (Fly.io, Railway, eigener
+Server) gibt es `server/Dockerfile`.
+
+**Lokal testen:**
+
+```bash
+cd server && npm install && npm start
 ```
 
-In manchen Netzen (z.B. strenge Firmen- oder Schulnetze) klappt eine direkte
-Verbindung nicht. Dann bräuchte es zusätzlich einen TURN-Server, der sich über
-`config: { iceServers: [...] }` in `NEONHOP_PEER` eintragen lässt.
+Dann in `js/config.js` vorübergehend `server: 'ws://localhost:8787'` eintragen.
+`npm test` im Ordner `server/` prüft das Protokoll (Räume, Weiterleitung, voller
+Raum, Rauswerfen, Herkunfts-Sperre).
 
 ## Level bearbeiten
 
@@ -141,7 +167,10 @@ erreichbar sind.
 | `js/engine.js` | Physik und Kollisionen (läuft auch in Node) |
 | `js/levels.js` | Level-Daten |
 | `js/audio.js` | Musik-Sequenzer und Soundeffekte |
-| `js/game.js` | Grafik, Eingabe, Menüs, Speicherstand |
+| `js/game.js` | Grafik, Eingabe, Menüs, Speicherstand, Mehrspieler-Lobby und Rennen |
+| `js/multiplayer.js` | Verbindung zum Mehrspieler-Server |
+| `js/config.js` | Einstellungen (Adresse des Mehrspieler-Servers) |
+| `server/` | Mehrspieler-Server (Node.js, WebSocket) |
 | `tools/verify-levels.js` | Prüft, ob alle Level schaffbar sind |
 
 ## Hinweis

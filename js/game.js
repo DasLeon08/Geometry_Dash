@@ -662,13 +662,23 @@
     broadcastRoom();
     renderLobby();
   });
-  N.on('hostLeft', () => {
+  // Langsamer Server (kostenlose Hoster schlafen und brauchen beim ersten Mal etwas länger)
+  N.on('slow', () => { if (mp.busy) mpStatus('Der Mehrspieler-Server startet gerade, einen Moment …'); });
+  // Host hat die Verbindung zum Server verloren
+  N.on('disconnected', () => {
+    if (!mp.inRoom) return;
+    leaveRoom();
+    openMp();
+    mpStatus('Verbindung zum Mehrspieler-Server verloren.', true);
+  });
+  N.on('hostLeft', (info) => {
     if (!mp.inRoom) return;
     // Nie eine Spielerliste bekommen: wir wurden gar nicht aufgenommen (z.B. Raum voll)
     const neverJoined = mp.players.length === 0;
     leaveRoom();
     openMp();
-    mpStatus(neverJoined ? 'Der Raum ist voll oder nicht mehr offen.' : 'Der Host hat den Raum verlassen.', true);
+    if (info && info.lost) mpStatus('Verbindung zum Mehrspieler-Server verloren.', true);
+    else mpStatus(neverJoined ? 'Der Raum ist voll oder nicht mehr offen.' : 'Der Host hat den Raum verlassen.', true);
   });
   N.on('message', ({ from, msg }) => {
     if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return;
