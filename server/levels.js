@@ -153,10 +153,12 @@ function createLevelApi({ store, engine, originAllowed, adminToken, log }) {
     }
     const result = engine.runReplay({ id: 'pruefung', map: [rows] }, { h0: rp.h0 === true, t: rp.t });
     if (!result.won) return { error: 'unbeaten' };
+    // Effekt-Trigger (nur Optik) mit denselben Regeln wie im Spiel prüfen
+    const extras = engine.cleanExtras(b.extras, w);
     return {
       rec: {
         name, author, author_hash: hash(b.authorKey), theme, music, difficulty,
-        data: JSON.stringify(rows), length: w, objects,
+        data: JSON.stringify(extras.length ? { rows, extras } : rows), length: w, objects,
       },
     };
   }

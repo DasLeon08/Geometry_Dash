@@ -170,6 +170,10 @@ Im Menü auf **Bauen** tippen. Unter **Meine Level** baut man bis zu 20 eigene L
 - Editor: Objekt wählen und tippen/klicken, ziehen malt. Rechtsklick oder Radierer löscht,
   „Hand“ oder Mausrad verschiebt, Strg+Z/Y, Tasten 1–9 wählen Objekte. Zahnrad: Name,
   Farben, Musik, Schwierigkeit.
+- **Effekte** (Farbe, Wackeln, Blitz, Puls, Zoom) setzt man wie Objekte; ein Klick auf einen
+  Effekt öffnet seine Einstellungen. Sie lösen aus, sobald die Spielfigur ihre Spalte erreicht
+  (gestrichelte Linie), sind im Spiel unsichtbar und ändern die Physik nicht – ein geschafftes
+  Level bleibt deshalb geschafft, wenn man nur Effekte ändert.
 - **Testen** spielt von Anfang an, **Ab hier** ab der aktuellen Stelle (zählt nicht).
 - **Veröffentlichen** geht erst, wenn man das Level im Test von Anfang an bis ins Ziel
   geschafft hat (mindestens 5 Objekte, 30 Spalten). Jede Änderung setzt das zurück.

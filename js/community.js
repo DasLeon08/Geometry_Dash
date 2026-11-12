@@ -78,6 +78,7 @@
       difficulty: Math.max(1, Math.min(4, Number(l.difficulty) | 0)),
       colors: LEVELS[theme].colors, music: LEVELS[music].music,
       map: [l.rows],
+      extras: E.cleanExtras(l.extras || [], l.rows[0].length),
     };
   }
   function validRows(rows) {
@@ -256,8 +257,9 @@
       const r = await api('/api/levels', 'POST', {
         name: draft.name, author: NH.save.name || 'Spieler', theme: draft.theme, music: draft.music,
         difficulty: draft.difficulty, rows, replay: draft.verified.replay, authorKey: keys().author,
+        extras: E.cleanExtras(draft.extras || [], rows[0].length),
       });
-      draft.published = { id: String(r.id).slice(0, 40), hash: ED.levelHash(draft) };
+      draft.published = { id: String(r.id).slice(0, 40), hash: ED.contentHash(draft) };
       ED.saveNow();
       NH.toast(r.duplicate ? 'Dieses Level ist schon online.' : 'Veröffentlicht! Jetzt können alle „' + draft.name + '“ spielen.');
       A.sfx('win');

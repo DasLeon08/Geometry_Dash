@@ -481,6 +481,15 @@
     .ed-scroll { width: 100%; accent-color: #b980ff; }
     .ed-pos { font-size: 11px; font-weight: 700; color: var(--sub); text-align: center; }
     #edSettings .panel { width: min(520px, 100%); }
+    #edFx .panel { width: min(460px, 100%); }
+    .fx-row { display: flex; align-items: center; gap: 10px; margin: 12px 0; text-align: left; }
+    .fx-row > span { width: 110px; font-size: 13px; font-weight: 700; color: var(--sub); flex: none; }
+    .fx-row input[type=range] { flex: 1; accent-color: #b980ff; }
+    .fx-row b { width: 52px; text-align: right; color: var(--ink); flex: none; }
+    .fx-swatches { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+    .fx-swatches button { width: 30px; height: 30px; border-radius: 9px; border: 3px solid var(--ink); }
+    .fx-swatches button.on { outline: 4px solid var(--sun); outline-offset: 1px; }
+    .fx-hint { font-size: 13px; color: var(--sub); margin: 4px 0 10px; }
     .themes { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
     .theme { height: 34px; border-radius: 10px; border: 3px solid var(--ink); }
     .theme.on { outline: 4px solid var(--sun); outline-offset: 1px; }
@@ -725,6 +734,19 @@
         </div>
       </div>
       <button class="btn-go" id="edSettingsDone">Fertig</button>
+    </div>
+  </div>
+
+  <div id="edFx" class="overlay dim hidden">
+    <div class="panel">
+      <div class="eyebrow">Effekt</div>
+      <div class="title" id="edFxTitle">Effekt</div>
+      <div class="fx-hint" id="edFxHint"></div>
+      <div id="edFxBody"></div>
+      <div class="row">
+        <button class="btn-go" id="edFxDone">Fertig</button>
+        <button class="btn-go secondary" id="edFxDel"><svg class="i"><use href="#i-trash"/></svg>Löschen</button>
+      </div>
     </div>
   </div>
 

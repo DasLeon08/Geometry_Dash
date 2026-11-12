@@ -120,7 +120,13 @@ async function suite(label, store) {
     const NEW = rowsWith(60, [['3', 4, 1], ['p', 14, 0], ['K', 30, 1], ['c', 40, 1], ['N', 45, 1], ['1', 50, 1]]);
     r = await pub(Object.assign({}, base, { name: 'Neue Teile', rows: NEW, replay: { h0: false, t: [] } }));
     ok(r.status === 201, 'Level mit neuen Objekten veröffentlicht');
-    await request(port, 'POST', '/api/admin/levels/' + r.json.id + '/delete', {}, { 'x-admin-token': 'admin-geheim-123' });
+    const newObjId = r.json.id;
+    const fxId = (await pub(Object.assign({}, base, { name: 'Mit Effekten', rows: NEW, replay: { h0: false, t: [] },
+      extras: [{ x: 5, y: 2, t: 'color', p: { theme: 3, fade: 1 } }, { x: 9, y: 2, t: 'zoom', p: { zoom: 9 } }, { x: 9, y: 3, t: 'kaputt' }] }))).json.id;
+    r = await request(port, 'GET', '/api/levels/' + fxId);
+    ok(r.json.extras.length === 2 && r.json.extras[1].p.zoom === 1.3 && r.json.rows.length === 10, 'Effekte gespeichert und geprüft (unbekannte entfernt, Werte begrenzt)');
+    await request(port, 'POST', '/api/admin/levels/' + fxId + '/delete', {}, { 'x-admin-token': 'admin-geheim-123' });
+    await request(port, 'POST', '/api/admin/levels/' + newObjId + '/delete', {}, { 'x-admin-token': 'admin-geheim-123' });
 
     // Prüfungen
     r = await pub(Object.assign({}, base, { name: 'Fick dich', rows: COINS, replay: { h0: false, t: [] } }));

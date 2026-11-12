@@ -333,7 +333,51 @@
     return { won: false, steps: limit, x: s.x };
   }
 
-  const Engine = { C, parseLevel, createState, cloneState, step, runReplay, CHAR_TYPES, SPEEDS };
+  /**
+   * Effekt-Trigger (nur Optik, keine Physik). Werden beim Laden und auf dem Server
+   * mit denselben Regeln geprüft: unbekannte Arten fliegen raus, Werte werden begrenzt.
+   *   color: Farben eines eingebauten Levels (theme) mit Übergang (fade, s)
+   *   shake: Wackeln (power 1–3, dur s)   flash: Blitz (color 0–5, dur s)
+   *   pulse: Puls im Takt (power 1–3, dur s)   zoom: Heranzoomen (zoom 1–1.3, dur s)
+   */
+  const FX = {
+    color: { theme: [0, 14, 0, true], fade: [0, 3, 1] },
+    shake: { power: [1, 3, 2, true], dur: [0.1, 2, 0.6] },
+    flash: { color: [0, 5, 0, true], dur: [0.1, 1.5, 0.5] },
+    pulse: { power: [1, 3, 2, true], dur: [0.5, 10, 4] },
+    zoom: { zoom: [1, 1.3, 1.15], dur: [0.1, 3, 1] },
+  };
+  const MAX_EXTRAS = 200;
+  function fxDefaults(t) {
+    const out = {};
+    Object.keys(FX[t]).forEach((k) => { out[k] = FX[t][k][2]; });
+    return out;
+  }
+  function cleanExtras(list, maxX) {
+    if (!Array.isArray(list)) return [];
+    const out = [];
+    const seen = new Set();
+    for (const e of list.slice(0, MAX_EXTRAS)) {
+      if (!e || typeof e !== 'object' || !FX[e.t]) continue;
+      const x = Math.floor(Number(e.x)), y = Math.floor(Number(e.y));
+      if (!isFinite(x) || !isFinite(y) || x < 0 || x > (maxX || 1012) || y < 0 || y > 9) continue;
+      if (seen.has(x + ',' + y)) continue;
+      seen.add(x + ',' + y);
+      const p = {};
+      const src = e.p && typeof e.p === 'object' ? e.p : {};
+      Object.keys(FX[e.t]).forEach((k) => {
+        const [lo, hi, def, int] = FX[e.t][k];
+        let v = Number(src[k]);
+        if (!isFinite(v)) v = def;
+        v = Math.max(lo, Math.min(hi, v));
+        p[k] = int ? Math.round(v) : Math.round(v * 100) / 100;
+      });
+      out.push({ x, y, t: e.t, p });
+    }
+    return out.sort((a, b) => a.x - b.x || a.y - b.y);
+  }
+
+  const Engine = { C, parseLevel, createState, cloneState, step, runReplay, CHAR_TYPES, SPEEDS, FX, fxDefaults, cleanExtras, MAX_EXTRAS };
   if (typeof module !== 'undefined' && module.exports) module.exports = Engine;
   else root.Engine = Engine;
 })(this);

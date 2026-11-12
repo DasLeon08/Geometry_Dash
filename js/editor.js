@@ -36,8 +36,20 @@
     { ch: 'p', name: 'Rosa Feld' }, { ch: 'r', name: 'Rosa Ring' },
     { ch: '1', name: 'Langsam' }, { ch: '2', name: 'Normal' }, { ch: '3', name: 'Schnell' }, { ch: '4', name: 'Sehr schnell' },
     { ch: 'K', name: 'Mini' }, { ch: 'N', name: 'Gross' },
+    { ch: 'fx:color', name: 'Farbe', fx: 'color' }, { ch: 'fx:shake', name: 'Wackeln', fx: 'shake' },
+    { ch: 'fx:flash', name: 'Blitz', fx: 'flash' }, { ch: 'fx:pulse', name: 'Puls', fx: 'pulse' },
+    { ch: 'fx:zoom', name: 'Zoom', fx: 'zoom' },
     { ch: '.', name: 'Radierer', erase: true }, { ch: 'hand', name: 'Hand', hand: true },
   ];
+  const FX_LOOK = {
+    color: { col: '#b980ff', sym: '◐', title: 'Farbwechsel', hint: 'Wechselt ab hier zu den Farben eines anderen Levels.' },
+    shake: { col: '#ff9b3b', sym: '≈', title: 'Wackeln', hint: 'Lässt den Bildschirm wackeln.' },
+    flash: { col: '#ffe066', sym: '✶', title: 'Blitz', hint: 'Ein kurzer Lichtblitz in einer Farbe.' },
+    pulse: { col: '#ff6fa8', sym: '◎', title: 'Puls', hint: 'Hintergrund und Objekte pulsieren stärker im Takt der Musik.' },
+    zoom: { col: '#4cc9f0', sym: '⊕', title: 'Zoom', hint: 'Zoomt um die Spielfigur heran (1 = normal).' },
+  };
+  const FLASH_SWATCHES = ['#ffffff', '#ffe066', '#5ee6ff', '#ff5ec8', '#7dff9a', '#ff5a5a'];
+  const FX_LABELS = { fade: 'Übergang (s)', power: 'Stärke', dur: 'Dauer (s)', zoom: 'Zoom' };
 
   // ---------------------------------------------------------------------
   // Entwürfe speichern und laden (alles wird geprüft, es kommt aus dem Speicher)
@@ -94,6 +106,7 @@
       music: clampInt(d.music, 0, LEVELS.length - 1),
       difficulty: clampInt(d.difficulty, 1, 4),
       rows, verified, published,
+      extras: E.cleanExtras(d.extras, MAX_COLS),
       updated: clampInt(d.updated, 0, 1e14),
     };
   }
@@ -127,6 +140,7 @@
       id: 'draft:' + d.id, name: d.name, difficulty: d.difficulty,
       colors: LEVELS[d.theme].colors, music: LEVELS[d.music].music,
       map: [canonicalRows(d.rows)],
+      extras: E.cleanExtras(d.extras || []),
     };
   }
   /** Kurzer Fingerabdruck des Levels (ändert sich bei jeder Änderung). */
@@ -141,8 +155,15 @@
     d.rows.forEach((r) => { for (let i = 0; i < r.length; i++) if (r[i] !== '.') n++; });
     return n;
   }
+  /** Fingerabdruck inklusive Effekte (Effekte ändern die Physik nicht, die veröffentlichte Version aber schon). */
+  function contentHash(d) {
+    const str = levelHash(d) + '|' + JSON.stringify(E.cleanExtras(d.extras || []));
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h.toString(36);
+  }
   function isVerified(d) { return !!(d.verified && d.verified.hash === levelHash(d)); }
-  function isPublished(d) { return !!(d.published && d.published.hash === levelHash(d)); }
+  function isPublished(d) { return !!(d.published && d.published.hash === contentHash(d)); }
   /** Was noch fehlt, um zu veröffentlichen (leer = alles ok). */
   function publishProblem(d) {
     if (!cleanText(d.name, 24)) return 'Gib dem Level einen Namen.';
@@ -200,9 +221,30 @@
     cur.rows = cur.rows.map((r) => (r + '.'.repeat(w)).slice(0, w));
     return true;
   }
+  function fxAt(x, y) { return (cur.extras || []).find((e) => e.x === x && e.y === y) || null; }
+  /** Trigger an einer Zelle setzen (now) oder entfernen (now = null); fürs Rückgängig merken. */
+  function setFx(x, y, now, record) {
+    const old = fxAt(x, y);
+    cur.extras = (cur.extras || []).filter((e) => e !== old);
+    if (now) cur.extras.push(now);
+    cur.extras.sort((a, b) => a.x - b.x || a.y - b.y);
+    if (record && stroke) stroke.push({ fx: true, x, y, old, now });
+  }
+  function placeFx(x, y, t) {
+    if (y < 0 || y >= ROWS || x < 0 || x >= MAX_COLS) return null;
+    const old = fxAt(x, y);
+    if (old && old.t === t) return old;
+    if ((cur.extras || []).length >= E.MAX_EXTRAS && !old) { NH.toast('Höchstens ' + E.MAX_EXTRAS + ' Effekte pro Level.'); return null; }
+    const now = { x, y, t, p: E.fxDefaults(t) };
+    setFx(x, y, now, true);
+    return now;
+  }
+
   /** Eine Zelle ändern und im aktuellen Strich merken. */
   function paint(x, y, ch) {
     if (y < 0 || y >= ROWS || x < 0 || !ensureWidth(x)) return;
+    if (ch.indexOf('fx:') === 0) { placeFx(x, y, ch.slice(3)); return; }
+    if (ch === '.' && fxAt(x, y)) { setFx(x, y, null, true); return; }   // Radierer entfernt zuerst Effekte
     const old = getCell(x, y);
     if (old === ch) return;
     setCell(x, y, ch);
@@ -227,7 +269,11 @@
   function undo() {
     const st = undoStack.pop();
     if (!st) return;
-    for (let i = st.length - 1; i >= 0; i--) { ensureWidth(st[i].x); setCell(st[i].x, st[i].y, st[i].old); }
+    for (let i = st.length - 1; i >= 0; i--) {
+      const c = st[i];
+      if (c.fx) setFx(c.x, c.y, c.old, false);
+      else { ensureWidth(c.x); setCell(c.x, c.y, c.old); }
+    }
     redoStack.push(st);
     A.sfx('click');
     changed();
@@ -235,7 +281,10 @@
   function redo() {
     const st = redoStack.pop();
     if (!st) return;
-    st.forEach((c) => { ensureWidth(c.x); setCell(c.x, c.y, c.ch); });
+    st.forEach((c) => {
+      if (c.fx) setFx(c.x, c.y, c.now, false);
+      else { ensureWidth(c.x); setCell(c.x, c.y, c.ch); }
+    });
     undoStack.push(st);
     A.sfx('click');
     changed();
@@ -301,6 +350,13 @@
       }
       case 'K': portal('#ff9b3b'); c.fillStyle = '#5ee6ff'; c.fillRect(13, 13, 6, 6); break;
       case 'N': portal('#5ee6ff'); c.fillStyle = '#5ee6ff'; c.fillRect(11, 11, 10, 10); break;
+      case 'fx:color': case 'fx:shake': case 'fx:flash': case 'fx:pulse': case 'fx:zoom': {
+        const look = FX_LOOK[t.fx];
+        circle(12, look.col, ink);
+        c.fillStyle = ink; c.font = 'bold 16px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText(look.sym, 16, 17);
+        break;
+      }
       case '.': c.strokeStyle = '#e03a5f'; c.lineWidth = 4; c.beginPath(); c.moveTo(8, 8); c.lineTo(24, 24); c.moveTo(24, 8); c.lineTo(8, 24); c.stroke(); break;
       case 'hand': c.fillStyle = ink; c.font = '20px sans-serif'; c.textAlign = 'center'; c.fillText('✋', 16, 24); break;
       default:
@@ -376,6 +432,61 @@
     b.onclick = () => { cur.difficulty = clampInt(b.dataset.d, 1, 4); changedSettings(); renderSettings(); };
   });
 
+  // ----- Effekt-Einstellungen -------------------------------------------
+  let fxEditing = null;
+  function openFx(e) {
+    fxEditing = e;
+    const look = FX_LOOK[e.t];
+    $('edFxTitle').textContent = look.title;
+    $('edFxHint').textContent = look.hint + ' (Spalte ' + e.x + ')';
+    const body = $('edFxBody');
+    body.textContent = '';
+    Object.keys(E.FX[e.t]).forEach((k) => {
+      const [lo, hi, , int] = E.FX[e.t][k];
+      const row = document.createElement('div');
+      row.className = 'fx-row';
+      const label = document.createElement('span');
+      if ((e.t === 'color' && k === 'theme') || (e.t === 'flash' && k === 'color')) {
+        label.textContent = e.t === 'color' ? 'Farben wie' : 'Farbe';
+        const sw = document.createElement('div');
+        sw.className = 'fx-swatches';
+        const n = e.t === 'color' ? LEVELS.length : FLASH_SWATCHES.length;
+        for (let i = 0; i < n; i++) {
+          const b = document.createElement('button');
+          if (e.t === 'color') {
+            b.style.background = 'linear-gradient(180deg,' + LEVELS[i].colors.bgTop + ',' + LEVELS[i].colors.bgBottom + ')';
+            b.style.boxShadow = 'inset 0 -5px 0 ' + LEVELS[i].colors.accent;
+            b.title = LEVELS[i].name;
+          } else b.style.background = FLASH_SWATCHES[i];
+          if (e.p[k] === i) b.className = 'on';
+          b.onclick = () => { e.p[k] = i; fxChanged(); openFx(e); };
+          sw.appendChild(b);
+        }
+        row.append(label, sw);
+      } else {
+        label.textContent = FX_LABELS[k] || k;
+        const r = document.createElement('input');
+        r.type = 'range'; r.min = String(lo); r.max = String(hi); r.step = int ? '1' : '0.05'; r.value = String(e.p[k]);
+        const val = document.createElement('b');
+        val.textContent = String(e.p[k]);
+        r.oninput = () => { e.p[k] = int ? Math.round(Number(r.value)) : Math.round(Number(r.value) * 100) / 100; val.textContent = String(e.p[k]); fxChanged(); };
+        row.append(label, r, val);
+      }
+      body.appendChild(row);
+    });
+    show('edFx', true);
+  }
+  function fxChanged() { cur.extras = E.cleanExtras(cur.extras, MAX_COLS); fxEditing = fxAt(fxEditing.x, fxEditing.y); changed(); }
+  function closeFx() { fxEditing = null; show('edFx', false); }
+  $('edFxDone').onclick = closeFx;
+  $('edFxDel').onclick = () => {
+    if (!fxEditing) return;
+    stroke = [];
+    setFx(fxEditing.x, fxEditing.y, null, true);
+    endStroke();
+    closeFx();
+  };
+
   // ----- Editor öffnen / schliessen ------------------------------------
   function openEditor(d, keepCam) {
     cur = d;
@@ -398,6 +509,7 @@
     game.groundOverride = null;
     show('editor', false);
     show('edSettings', false);
+    show('edFx', false);
     cur = null;
     NH.goMenu();
     openCommunity('mine');
@@ -473,6 +585,7 @@
     stroke = [];
     const ch = ev.button === 2 ? '.' : tool;
     stroke.ch = ch;
+    stroke.start = { x: ev.clientX, y: ev.clientY };
     paint(cell.x, cell.y, ch);
   });
   canvas.addEventListener('pointermove', (ev) => {
@@ -491,7 +604,12 @@
     touches.delete(ev.pointerId);
     if (game.scene !== 'editor') return;
     if (pan && ev.pointerId === pan.id) pan = null;
+    // ein einzelner Klick mit einem Effekt-Werkzeug: Einstellungen öffnen
+    const single = stroke && stroke.ch && stroke.ch.indexOf('fx:') === 0 && stroke.start &&
+      Math.abs(stroke.start.x - ev.clientX) < 6 && Math.abs(stroke.start.y - ev.clientY) < 6;
+    const cell = single ? cellOf(ev) : null;
     endStroke();
+    if (cell) { const e = fxAt(cell.x, cell.y); if (e) openFx(e); }
   };
   canvas.addEventListener('pointerup', pointerEnd);
   canvas.addEventListener('pointercancel', pointerEnd);
@@ -506,6 +624,7 @@
     if (game.scene !== 'editor' || !cur) return;
     if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'SELECT')) return;
     if (!$('edSettings').classList.contains('hidden')) { if (ev.code === 'Escape') closeSettings(); return; }
+    if (!$('edFx').classList.contains('hidden')) { if (ev.code === 'Escape') closeFx(); return; }
     const ctrl = ev.ctrlKey || ev.metaKey;
     if (ctrl && ev.code === 'KeyZ') { ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); return; }
     if (ctrl && ev.code === 'KeyY') { ev.preventDefault(); redo(); return; }
@@ -563,6 +682,23 @@
     // Objekte und Ziel
     G.drawObjects(parsed, colors, 0.5);
     G.drawEnd(colors);
+    // Effekt-Trigger: Abzeichen + gestrichelte Linie, ab der sie auslösen
+    (cur.extras || []).forEach((e) => {
+      if (e.x < left - 1 || e.x > right + 1) return;
+      const look = FX_LOOK[e.t];
+      const px = G.wx(e.x + 0.5), py = G.wy(e.y + 0.5);
+      ctx.save();
+      ctx.setLineDash([5, 6]);
+      ctx.strokeStyle = look.col; ctx.globalAlpha = 0.45; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px, G.groundY); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = look.col; ctx.strokeStyle = G.INK; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(px, py, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = G.INK; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(look.sym, px, py + 1);
+      ctx.restore();
+    });
     // Spielfigur am Start
     ctx.save();
     ctx.globalAlpha = 0.85;
@@ -581,6 +717,13 @@
       if (tool === '.') {
         ctx.strokeStyle = '#ff5e7e'; ctx.lineWidth = 3;
         ctx.strokeRect(G.wx(hover.x) + 2, G.wy(hover.y + 1) + 2, TS - 4, TS - 4);
+      } else if (tool.indexOf('fx:') === 0) {
+        const look = FX_LOOK[tool.slice(3)];
+        ctx.save();
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = look.col;
+        ctx.beginPath(); ctx.arc(G.wx(hover.x + 0.5), G.wy(hover.y + 0.5), 14, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
       } else {
         const type = E.CHAR_TYPES[tool];
         ctx.save();
@@ -619,7 +762,7 @@
     if (drafts.length >= MAX_DRAFTS) { $('cmStatus').textContent = 'Du hast schon ' + MAX_DRAFTS + ' Level. Lösche zuerst eins.'; return; }
     const d = {
       id: newId(), name: 'Mein Level ' + (drafts.length + 1), theme: 0, music: 0, difficulty: 1,
-      rows: emptyRows(NEW_COLS), verified: null, published: null, updated: Date.now(),
+      rows: emptyRows(NEW_COLS), extras: [], verified: null, published: null, updated: Date.now(),
     };
     drafts.unshift(d);
     saveNow();
@@ -716,7 +859,7 @@
   }
 
   const api = {
-    render, openCommunity, openEditor, buildDef, levelHash, canonicalRows, isVerified, saveNow,
+    render, openCommunity, openEditor, buildDef, levelHash, contentHash, canonicalRows, isVerified, saveNow,
     get drafts() { return drafts; },
     get current() { return cur; },
     refresh: updateUI,

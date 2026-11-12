@@ -21,7 +21,12 @@ function publicLevel(r, withRows) {
     difficulty: Number(r.difficulty), length: Number(r.length), objects: Number(r.objects),
     plays: Number(r.plays), likes: Number(r.likes), created: Number(r.created_at),
   };
-  if (withRows) out.rows = JSON.parse(r.data);
+  if (withRows) {
+    // ältere Einträge: nur Zeilen; neuere: { rows, extras }
+    const d = JSON.parse(r.data);
+    out.rows = Array.isArray(d) ? d : d.rows;
+    out.extras = Array.isArray(d) ? [] : (d.extras || []);
+  }
   return out;
 }
 function adminLevel(r) {

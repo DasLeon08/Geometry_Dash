@@ -1007,6 +1007,7 @@
       if (game.custom && game.custom.startX > 0) { game.state.x = game.custom.startX; game.attemptStartX = game.custom.startX; }
     }
     game.state.prevHeld = held;      // gehaltene Taste nicht als neuen Klick zählen
+    fxReset(game.state.x);
     // Aufnahme des Laufs (nur von Anfang an, normaler Modus): in welchem Schritt wechselt die Taste?
     game.rec = !game.practice && !cp && !(game.custom && game.custom.startX > 0)
       ? { h0: held, last: held, steps: 0, t: [] } : null;
@@ -1120,6 +1121,7 @@
     }
     s.events.length = 0;
     if (s.dead || s.won) return;
+    if (fx.next < fx.list.length) fxUpdate(s.x);
 
     // Drehung des Würfels
     if (s.mode === 'cube') {
@@ -1151,6 +1153,58 @@
           life: 0.35, max: 0.35, size: 0.12, color: cols[0], square: true });
       }
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // Effekt-Trigger aus eigenen Leveln (nur Optik)
+  // ---------------------------------------------------------------------
+  const FLASH_COLORS = ['255,255,255', '255,224,102', '94,230,255', '255,94,200', '125,255,154', '255,90,90'];
+  const fx = { list: [], next: 0, base: null, color: null, pulseUntil: 0, pulsePower: 0, zoom: null, flashRgb: FLASH_COLORS[0], flashDecay: 2, shakePower: 1 };
+
+  /** Beim (Neu-)Start: Trigger vor der Startposition gelten als schon passiert (nur Farbe zählt). */
+  function fxReset(startX) {
+    const def = game.level.def;
+    fx.list = E.cleanExtras(def.extras || []);
+    fx.next = 0;
+    fx.base = def.colors;
+    fx.color = null; fx.zoom = null; fx.pulseUntil = 0;
+    fx.flashRgb = FLASH_COLORS[0]; fx.flashDecay = 2; fx.shakePower = 1;
+    while (fx.next < fx.list.length && fx.list[fx.next].x < startX) {
+      const e = fx.list[fx.next++];
+      if (e.t === 'color') fx.base = window.LEVELS[e.p.theme].colors;
+    }
+  }
+  function fxUpdate(x) {
+    while (fx.next < fx.list.length && fx.list[fx.next].x <= x + 0.5) fxFire(fx.list[fx.next++]);
+  }
+  function fxFire(e) {
+    const p = e.p;
+    const soft = save.fxReduced;
+    if (e.t === 'color') fx.color = { from: fxColors(), to: window.LEVELS[p.theme].colors, t0: time, dur: p.fade };
+    else if (e.t === 'shake') { game.shake = Math.max(game.shake, soft ? p.dur * 0.4 : p.dur); fx.shakePower = soft ? 0.5 : p.power; }
+    else if (e.t === 'flash') { fx.flashRgb = FLASH_COLORS[p.color]; game.flash = soft ? 0.35 : 1; fx.flashDecay = 1 / p.dur; }
+    else if (e.t === 'pulse') { fx.pulseUntil = time + p.dur; fx.pulsePower = soft ? 1 : p.power; }
+    else if (e.t === 'zoom') fx.zoom = { from: fxZoom(), to: p.zoom, t0: time, dur: p.dur };
+  }
+  function lerpHex(a, b, k) {
+    const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16);
+    const c = (sh) => Math.round(((x >> sh) & 255) + ((((y >> sh) & 255) - ((x >> sh) & 255)) * k));
+    return '#' + ((1 << 24) | (c(16) << 16) | (c(8) << 8) | c(0)).toString(16).slice(1);
+  }
+  /** Aktuelle Farben (mit laufendem Farbwechsel). */
+  function fxColors() {
+    if (!fx.base) return game.level ? game.level.def.colors : window.LEVELS[0].colors;
+    if (!fx.color) return fx.base;
+    const k = fx.color.dur > 0 ? Math.min(1, (time - fx.color.t0) / fx.color.dur) : 1;
+    if (k >= 1) { fx.base = fx.color.to; fx.color = null; return fx.base; }
+    const f = fx.color.from, t = fx.color.to;
+    return { bgTop: lerpHex(f.bgTop, t.bgTop, k), bgBottom: lerpHex(f.bgBottom, t.bgBottom, k), accent: lerpHex(f.accent, t.accent, k), ground: lerpHex(f.ground, t.ground, k) };
+  }
+  function fxZoom() {
+    if (!fx.zoom) return 1;
+    const k = fx.zoom.dur > 0 ? Math.min(1, (time - fx.zoom.t0) / fx.zoom.dur) : 1;
+    const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;   // sanft an- und auslaufen
+    return fx.zoom.from + (fx.zoom.to - fx.zoom.from) * e;
   }
 
   // ---------------------------------------------------------------------
@@ -1602,21 +1656,29 @@
     }
 
     const s = game.state;
+    const playColors = fxColors();
     camX = s.x - PLAYER_SCREEN_X;
     const roofTarget = (s.mode === 'ship' || s.gs === -1) ? 1 : 0;
     game.roofAlpha += (roofTarget - game.roofAlpha) * 0.08;
 
     ctx.save();
     if (game.shake > 0) {
-      const m = game.shake * 14;
+      const m = game.shake * 14 * fx.shakePower;
       ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m);
+    } else fx.shakePower = 1;
+    const pulsing = time < fx.pulseUntil ? fx.pulsePower : 0;
+    drawBackground(playColors, pulse * pulse * (1 + pulsing * 1.5));
+    // Zoom (Trigger) und Puls im Takt: um die Spielfigur herum vergrössern
+    const zoom = fxZoom() * (1 + pulsing * 0.012 * pulse * pulse);
+    if (zoom !== 1) {
+      const zx = PLAYER_SCREEN_X * TS, zy = groundY - 4 * TS;
+      ctx.translate(zx, zy); ctx.scale(zoom, zoom); ctx.translate(-zx, -zy);
     }
-    drawBackground(colors, pulse * pulse);
     drawAttemptText();
-    drawGround(colors);
+    drawGround(playColors);
 
-    drawObjects(game.level, colors, pulse);
-    drawEnd(colors);
+    drawObjects(game.level, playColors, pulsing ? Math.min(1, pulse * (1 + pulsing * 0.5)) : pulse);
+    drawEnd(playColors);
     drawCheckpoints();
     drawParticles();
     drawGhosts();
@@ -1624,7 +1686,7 @@
     ctx.restore();
 
     if (game.flash > 0) {
-      ctx.fillStyle = 'rgba(255,255,255,' + (game.flash * 0.5) + ')';
+      ctx.fillStyle = 'rgba(' + fx.flashRgb + ',' + (game.flash * 0.5) + ')';
       ctx.fillRect(0, 0, viewW, viewH);
     }
     drawHud();
@@ -1676,7 +1738,8 @@
     game.goFlash = Math.max(0, (game.goFlash || 0) - dt);
     if (game.race) mpSendState(now);
     game.shake = Math.max(0, game.shake - dt);
-    game.flash = Math.max(0, game.flash - dt * 2);
+    game.flash = Math.max(0, game.flash - dt * fx.flashDecay);
+    if (game.flash <= 0) { fx.flashDecay = 2; fx.flashRgb = FLASH_COLORS[0]; }
     render();
     requestAnimationFrame(frame);
   }
