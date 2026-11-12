@@ -2,7 +2,7 @@
  * Neon Hop – Mehrspieler-Server.
  *
  * Ein kleiner WebSocket-Server, der Räume verwaltet und Nachrichten zwischen
- * den Spielern weiterleitet. Alle Spieler verbinden sich nur mit diesem Server
+ * den Spielern weiterleitet. Dazu die HTTP-API für Online-Level (levels.js). Alle Spieler verbinden sich nur mit diesem Server
  * (keine direkten Verbindungen zwischen Handys), darum klappt es in jedem Netz.
  *
  * Start:  npm install && npm start      (Port aus $PORT, sonst 8787)
@@ -26,7 +26,12 @@
 
 const http = require('http');
 const crypto = require('crypto');
+const path = require('path');
 const { WebSocketServer } = require('ws');
+const { createStore } = require('./store');
+const { createLevelApi } = require('./levels');
+// Dieselbe Spielphysik wie im Spiel: damit werden veröffentlichte Läufe nachgespielt
+const engine = require(path.join(__dirname, '..', 'js', 'engine.js'));
 
 const PORT = Number(process.env.PORT) || 8787;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -65,10 +70,24 @@ function originAllowed(origin) {
   return ORIGIN_PATTERNS.some((re) => re.test(o));
 }
 
-const server = http.createServer((req, res) => {
+const store = createStore();
+const levelApi = createLevelApi({
+  store, engine, originAllowed, adminToken: process.env.ADMIN_TOKEN || '',
+  log: (m) => console.log(m),
+});
+
+const server = http.createServer(async (req, res) => {
+  try {
+    if (await levelApi.handle(req, res)) return;
+  } catch (e) {
+    console.log('Unerwarteter Fehler: ' + (e && e.message));
+    if (!res.headersSent) { res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' }); res.end('Fehler\n'); }
+    return;
+  }
   if (req.url === '/' || req.url === '/health') {
     res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
-    res.end('Neon Hop Mehrspieler-Server läuft. Offene Räume: ' + rooms.size + '\n');
+    res.end('Neon Hop Mehrspieler-Server läuft. Offene Räume: ' + rooms.size +
+      '. Level-Speicher: ' + (store.kind === 'postgres' ? 'Datenbank' : 'Arbeitsspeicher (ohne DATABASE_URL, geht beim Neustart verloren)') + '\n');
     return;
   }
   res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
@@ -187,9 +206,10 @@ const heartbeat = setInterval(() => {
 }, 25000);
 wss.on('close', () => clearInterval(heartbeat));
 
+levelApi.init();
 server.listen(PORT, HOST, () => {
   console.log('Neon Hop Mehrspieler-Server läuft auf ' + HOST + ':' + PORT +
     (ALLOWED_ORIGINS.length ? ' (erlaubt: ' + ALLOWED_ORIGINS.join(', ') + ')' : ' (alle Seiten erlaubt)'));
 });
 
-module.exports = { server, wss, rooms };
+module.exports = { server, wss, rooms, store };

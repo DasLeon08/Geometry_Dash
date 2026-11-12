@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Neon Hop – Verwaltung</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #1d1442; color: #fff8ec; }
+    main { max-width: 900px; margin: 0 auto; padding: 20px 16px; }
+    h1 { margin: 0 0 12px; font-size: 26px; }
+    .bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    input, button { font: inherit; border-radius: 10px; border: 2px solid #fff8ec; padding: 8px 12px; }
+    input { flex: 1; min-width: 200px; background: #fff8ec; color: #1d1442; }
+    button { background: #ffe066; color: #1d1442; font-weight: 700; cursor: pointer; }
+    button.ghost { background: transparent; color: #fff8ec; }
+    button.danger { background: #ff6b8b; }
+    table { width: 100%; border-collapse: collapse; background: #2b1d6b; border-radius: 12px; overflow: hidden; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #3d2d8a; font-size: 14px; }
+    td.n { text-align: right; }
+    tr.hidden td { opacity: .6; }
+    #status { min-height: 22px; margin: 8px 0; color: #ffe066; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Neon Hop – Online-Level verwalten</h1>
+    <div class="bar">
+      <input id="token" type="password" placeholder="ADMIN_TOKEN (steht bei Render unter Environment)" autocomplete="off">
+      <button id="reported">Gemeldete</button>
+      <button id="newest" class="ghost">Neueste</button>
+    </div>
+    <div id="status"></div>
+    <table>
+      <thead><tr><th>Name</th><th>Von</th><th class="n">Gespielt</th><th class="n">Likes</th><th class="n">Meldungen</th><th>Status</th><th></th></tr></thead>
+      <tbody id="list"></tbody>
+    </table>
+  </main>
+  <script src="/admin.js"></script>
+</body>
+</html>

@@ -25,3 +25,7 @@
 - Toki: Spiel wird über `toki.json` (Repo-Wurzel) beschrieben; Toki-Skript v6 im `<head>`
   (`toki.score`, `toki.room`, `toki.onHost`, `toki.onName`). Gleicher Aufbau wie im Repo
   `DasLeon08/Scam_with_your_bros`, das ebenfalls einen eigenen Render-Server nutzt.
+- Editor/Online-Level: `js/editor.js` (Entwürfe in localStorage `neonhop.editor.v1`), `js/community.js`,
+  Server `server/levels.js` + `server/store.js` (Postgres über `DATABASE_URL`, sonst Arbeitsspeicher).
+  Veröffentlichen nur mit Replay, das `Engine.runReplay` ins Ziel bringt – darum muss `js/engine.js`
+  deterministisch bleiben (kein `Math.random`, keine Trigonometrie, fester Zeitschritt).

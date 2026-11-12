@@ -5,12 +5,18 @@ services:
     name: neonhop-server
     runtime: node
     plan: free
-    rootDir: server
-    buildCommand: npm ci --omit=dev
-    startCommand: npm start
+    # baut aus dem Hauptordner, weil der Server die Spielphysik js/engine.js mitbenutzt
+    buildCommand: cd server && npm ci --omit=dev
+    startCommand: node server/server.js
     healthCheckPath: /health
     envVars:
       # Komma-Liste der Seiten, von denen aus gespielt werden darf ("*" = ein Namensteil).
       # Toki-Spiele laufen unter <slug>.playtoki.app.
       - key: ALLOWED_ORIGINS
         value: https://*.playtoki.app,https://playtoki.app,https://toki-ashy.vercel.app
+      # Datenbank für Online-Level (z.B. kostenlos bei neon.tech). Render fragt danach.
+      - key: DATABASE_URL
+        sync: false
+      # Passwort für die Verwaltungsseite /admin (Render erzeugt es; ansehen unter Environment)
+      - key: ADMIN_TOKEN
+        generateValue: true

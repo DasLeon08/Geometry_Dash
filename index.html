@@ -449,6 +449,8 @@
     .cm-pager { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 6px; font-weight: 700; color: var(--sub); }
     .cm-pager .icon-btn { width: 38px; height: 38px; }
 
+    #community .tile { min-height: 50px; flex-direction: row; gap: 8px; }
+    #community .tile svg.i { width: 22px; height: 22px; }
     #editor { position: fixed; inset: 0; z-index: 8; pointer-events: none; }
     #editor > * { pointer-events: auto; }
     .ed-top {
@@ -493,7 +495,16 @@
       .ed-tool { width: 56px; font-size: 9px; padding: 2px; }
       .ed-tool canvas { width: 24px; height: 24px; }
       .ed-pos { display: none; }
-      .cm-list { max-height: 52vh; }
+      .cm-list { max-height: 46vh; }
+      #community .eyebrow { display: none; }
+      #community .title { font-size: 20px; margin: 0; }
+      #community .tile { min-height: 38px; }
+      #community .tiles { margin-top: 4px; }
+      .cm-tools { margin-bottom: 4px; }
+      .cm-tools .input { height: 36px; }
+      .cm-pager { margin-top: 2px; }
+      .cm-pager .icon-btn { width: 32px; height: 32px; }
+      #community .status { min-height: 0; margin-top: 2px; }
       .cm-item canvas { width: 90px; height: 45px; }
       .tabs { margin: 6px 0; }
     }
@@ -833,5 +844,6 @@
   <script src="js/multiplayer.js"></script>
   <script src="js/game.js"></script>
   <script src="js/editor.js"></script>
+  <script src="js/community.js"></script>
 </body>
 </html>

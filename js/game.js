@@ -43,11 +43,14 @@
     data.name = typeof raw.name === 'string' ? raw.name.replace(/[\u0000-\u001f<>]/g, '').slice(0, 16) : '';
     data.nameTyped = raw.nameTyped === true;
     const levels = raw.levels && typeof raw.levels === 'object' ? raw.levels : {};
-    window.LEVELS.forEach((def) => {
-      const l = levels[def.id];
+    // eingebaute Level plus höchstens 200 Online-Level ("online:<id>")
+    const ids = window.LEVELS.map((def) => def.id)
+      .concat(Object.keys(levels).filter((k) => /^online:[a-z0-9]{1,12}$/.test(k)).slice(0, 200));
+    ids.forEach((id) => {
+      const l = levels[id];
       if (!l || typeof l !== 'object') return;
       const coins = Array.isArray(l.coins) ? l.coins.map((c) => clampInt(c, 99)) : [];
-      data.levels[def.id] = {
+      data.levels[id] = {
         best: clampInt(l.best, 100),
         practice: clampInt(l.practice, 100),
         attempts: clampInt(l.attempts, 1e9),

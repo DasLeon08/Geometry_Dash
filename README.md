@@ -21,6 +21,8 @@ Rakete durch Tunnel und drehst die Schwerkraft um.
   schwerere Level klingen energiegeladener, dazu eine ruhige Menü-Musik
 - Scroll-Menü: Level per Wischen, Mausrad, Ziehen oder Pfeiltasten durchblättern
 - Mehrspieler-Rennen für bis zu 4 Spieler mit Raumcode (siehe unten)
+- Level-Editor: eigene Level bauen, testen und – wenn man sie geschafft hat – online
+  veröffentlichen; Online-Level anderer Spieler entdecken, spielen, liken und melden
 - 6 Farben für den Würfel
 - Läuft auf PC (Tastatur/Maus) und Handy/Tablet (Touch, Querformat)
 - Fortschritt wird lokal im Browser gespeichert (`localStorage`)
@@ -153,8 +155,44 @@ cd server && npm install && npm start
 ```
 
 Dann in `js/config.js` vorübergehend `server: 'ws://localhost:8787'` eintragen.
-`npm test` im Ordner `server/` prüft das Protokoll (Räume, Weiterleitung, voller
-Raum, Rauswerfen, Herkunfts-Sperre).
+`npm test` im Ordner `server/` prüft das Mehrspieler-Protokoll (Räume, Weiterleitung,
+voller Raum, Rauswerfen, Herkunfts-Sperre) und die Level-API (Veröffentlichen mit
+nachgespieltem Lauf, Filter, Likes, Meldungen, Verwaltung, Begrenzungen) mit
+Arbeitsspeicher und nachgebildetem Postgres.
+
+## Level-Editor und Online-Level
+
+Im Menü auf **Bauen** tippen. Unter **Meine Level** baut man bis zu 20 eigene Level
+(gespeichert im Browser, Toki synchronisiert sie auf andere Geräte), unter
+**Entdecken** spielt man die Level anderer.
+
+- Editor: Objekt wählen und tippen/klicken, ziehen malt. Rechtsklick oder Radierer löscht,
+  „Hand“ oder Mausrad verschiebt, Strg+Z/Y, Tasten 1–9 wählen Objekte. Zahnrad: Name,
+  Farben, Musik, Schwierigkeit.
+- **Testen** spielt von Anfang an, **Ab hier** ab der aktuellen Stelle (zählt nicht).
+- **Veröffentlichen** geht erst, wenn man das Level im Test von Anfang an bis ins Ziel
+  geschafft hat (mindestens 5 Objekte, 30 Spalten). Jede Änderung setzt das zurück.
+- Beweis: Das Spiel zeichnet auf, in welchem Simulationsschritt die Taste gedrückt bzw.
+  losgelassen wurde. Der Server spielt diesen Lauf mit derselben Physik (`js/engine.js`,
+  ohne Zufall, fester Zeitschritt) nach und speichert das Level nur, wenn er ins Ziel kommt.
+- Namen werden gefiltert (Schimpfwörter, Links, Telefonnummern). Ab 5 Meldungen wird ein
+  Level automatisch versteckt. Eigene Level kann man unter „Meine Level“ wieder offline nehmen.
+
+### Datenbank einrichten (kostenlos, einmalig)
+
+Ohne Datenbank speichert der Server Online-Level nur im Arbeitsspeicher – sie sind nach
+jedem Neustart weg (die Gesundheitsseite `/health` zeigt das an).
+
+1. Auf [neon.tech](https://neon.tech) ein kostenloses Konto anlegen und ein Projekt erstellen.
+2. Unter **Connection string** die Adresse kopieren (beginnt mit `postgresql://`).
+3. Bei Render im Dienst `neonhop-server` unter **Environment** die Variable `DATABASE_URL`
+   mit dieser Adresse eintragen und speichern. Die Tabellen legt der Server selbst an.
+
+### Verwaltung
+
+`https://neonhop-server.onrender.com/admin` öffnen und das `ADMIN_TOKEN` eingeben (Render
+erzeugt es selbst, zu finden unter **Environment**). Dort siehst du gemeldete und neue Level
+und kannst sie verstecken, wieder freigeben oder löschen.
 
 ## Level bearbeiten
 
@@ -183,7 +221,12 @@ erreichbar sind.
 | `js/game.js` | Grafik, Eingabe, Menüs, Speicherstand, Mehrspieler-Lobby und Rennen |
 | `js/multiplayer.js` | Verbindung zum Mehrspieler-Server |
 | `js/config.js` | Einstellungen (Adresse des Mehrspieler-Servers) |
-| `server/` | Mehrspieler-Server (Node.js, WebSocket) |
+| `js/editor.js` | Level-Editor und „Meine Level“ |
+| `js/community.js` | Online-Level: Entdecken, Veröffentlichen, Likes, Meldungen |
+| `server/server.js` | Mehrspieler-Server (WebSocket) und HTTP |
+| `server/levels.js` | Level-API: prüft und spielt Läufe nach |
+| `server/store.js` | Speicher: Postgres oder Arbeitsspeicher |
+| `server/filter.js` | Filter für Namen |
 | `tools/verify-levels.js` | Prüft, ob alle Level schaffbar sind |
 
 ## Hinweis

@@ -646,9 +646,9 @@
       name.textContent = d.name;
       const meta = document.createElement('div');
       meta.className = 'cm-meta';
-      if (isPublished(d)) meta.appendChild(chip('Veröffentlicht', 'pub'));
-      else if (isVerified(d)) meta.appendChild(chip('✔ Geschafft', 'ok'));
-      else meta.appendChild(chip('Entwurf'));
+      if (isPublished(d)) meta.appendChild(chip('Online', 'pub'));
+      else if (d.published) meta.appendChild(chip('Online (ältere Version)', 'pub'));
+      if (!isPublished(d)) meta.appendChild(isVerified(d) ? chip('✔ Geschafft', 'ok') : chip('Entwurf'));
       const facts = document.createElement('span');
       facts.textContent = objectCount(d) + ' Objekte · ' + canonicalRows(d.rows)[0].length + ' Spalten';
       meta.appendChild(facts);
@@ -656,12 +656,31 @@
       const actions = document.createElement('div');
       actions.className = 'cm-actions';
       actions.appendChild(iconBtn('edit', 'Bearbeiten', () => openEditor(d), 'go'));
+      if (d.published && window.NeonCommunity) {
+        let armedOnline = false;
+        const off = iconBtn('globe', 'Online entfernen', async () => {
+          if (!armedOnline) {
+            armedOnline = true;
+            off.style.background = '#ff6b8b';
+            $('cmStatus').textContent = 'Nochmal tippen, um „' + d.name + '“ aus der Online-Liste zu entfernen.';
+            setTimeout(() => { armedOnline = false; off.style.background = ''; }, 3000);
+            return;
+          }
+          try {
+            await window.NeonCommunity.unpublish(d);
+            $('cmStatus').textContent = '„' + d.name + '“ ist nicht mehr online.';
+          } catch (e) { $('cmStatus').textContent = e.message; }
+          renderMine();
+        });
+        actions.appendChild(off);
+      }
       let armed = false;
       const del = iconBtn('trash', 'Löschen', () => {
         if (!armed) {
           armed = true;
           del.style.background = '#ff6b8b';
-          $('cmStatus').textContent = 'Nochmal tippen zum Löschen von „' + d.name + '“.';
+          $('cmStatus').textContent = 'Nochmal tippen zum Löschen von „' + d.name + '“.' +
+            (d.published ? ' Die Online-Version bleibt bestehen (dafür „Online entfernen“).' : '');
           setTimeout(() => { armed = false; del.style.background = ''; }, 3000);
           return;
         }
