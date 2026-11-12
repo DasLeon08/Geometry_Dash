@@ -30,9 +30,12 @@
 
   const TOOLS = [
     { ch: '#', name: 'Block' }, { ch: '^', name: 'Stachel' }, { ch: 'v', name: 'Hängend' },
-    { ch: 'm', name: 'Mini' }, { ch: '_', name: 'Sprungfeld' }, { ch: 'o', name: 'Ring' },
+    { ch: 'm', name: 'Kl. Stachel' }, { ch: '_', name: 'Sprungfeld' }, { ch: 'o', name: 'Ring' },
     { ch: 'b', name: 'Blauer Ring' }, { ch: 'c', name: 'Münze' }, { ch: 'S', name: 'Rakete' },
     { ch: 'C', name: 'Würfel' }, { ch: 'U', name: 'Schwerkr. ↑' }, { ch: 'D', name: 'Schwerkr. ↓' },
+    { ch: 'p', name: 'Rosa Feld' }, { ch: 'r', name: 'Rosa Ring' },
+    { ch: '1', name: 'Langsam' }, { ch: '2', name: 'Normal' }, { ch: '3', name: 'Schnell' }, { ch: '4', name: 'Sehr schnell' },
+    { ch: 'K', name: 'Mini' }, { ch: 'N', name: 'Gross' },
     { ch: '.', name: 'Radierer', erase: true }, { ch: 'hand', name: 'Hand', hand: true },
   ];
 
@@ -286,6 +289,18 @@
       case 'C': portal('#7dff9a'); break;
       case 'U': portal('#ffd84a'); c.fillStyle = ink; c.font = 'bold 14px sans-serif'; c.textAlign = 'center'; c.fillText('↑', 16, 21); break;
       case 'D': portal('#4aa8ff'); c.fillStyle = ink; c.font = 'bold 14px sans-serif'; c.textAlign = 'center'; c.fillText('↓', 16, 21); break;
+      case 'p': c.beginPath(); c.ellipse(16, 26, 11, 5, 0, Math.PI, 0); c.fillStyle = '#ff6fd1'; c.fill(); c.strokeStyle = ink; c.lineWidth = 2; c.stroke(); break;
+      case 'r': circle(6, '#ff6fd1'); circle(11, null, '#ff6fd1'); break;
+      case '1': case '2': case '3': case '4': {
+        const col = { 1: '#ffb03b', 2: '#5ee6ff', 3: '#7dff9a', 4: '#ff5ec8' }[t.ch];
+        c.strokeStyle = col; c.lineWidth = 3; c.strokeRect(4, 3, 24, 26);
+        c.lineWidth = 3; c.lineCap = 'round';
+        const n = Number(t.ch), gap = 5, x0 = 16 - (n - 1) * gap / 2;
+        for (let i = 0; i < n; i++) { const x = x0 + i * gap; c.beginPath(); c.moveTo(x - 3, 10); c.lineTo(x + 2, 16); c.lineTo(x - 3, 22); c.stroke(); }
+        break;
+      }
+      case 'K': portal('#ff9b3b'); c.fillStyle = '#5ee6ff'; c.fillRect(13, 13, 6, 6); break;
+      case 'N': portal('#5ee6ff'); c.fillStyle = '#5ee6ff'; c.fillRect(11, 11, 10, 10); break;
       case '.': c.strokeStyle = '#e03a5f'; c.lineWidth = 4; c.beginPath(); c.moveTo(8, 8); c.lineTo(24, 24); c.moveTo(24, 8); c.lineTo(8, 24); c.stroke(); break;
       case 'hand': c.fillStyle = ink; c.font = '20px sans-serif'; c.textAlign = 'center'; c.fillText('✋', 16, 24); break;
       default:

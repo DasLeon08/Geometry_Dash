@@ -23,7 +23,12 @@
     SNAP: 0.4,          // wie weit man auf eine Kante "hochrutschen" darf
     INNER: 0.3,         // Rand der inneren Hitbox (Kollision mit Blöcken)
     HAZ: 0.12,          // Rand der Hitbox gegen Stacheln
+    PINK: 0.72,         // rosa Sprungfeld / Ring: kleinerer Sprung
+    MINI_SIZE: 0.5,     // Mini-Würfel: halbe Grösse
+    MINI_JUMP: 0.82,    // Mini-Würfel springt etwas weniger hoch
   };
+  // Tempo-Portale: langsam, normal, schnell, sehr schnell
+  const SPEEDS = { speed1: 0.8, speed2: 1, speed3: 1.3, speed4: 1.6 };
 
   const CHAR_TYPES = {
     '#': 'block',
@@ -38,10 +43,18 @@
     'C': 'cube',
     'U': 'gravUp',
     'D': 'gravDown',
+    'p': 'padPink',
+    'r': 'orbPink',
+    '1': 'speed1',
+    '2': 'speed2',
+    '3': 'speed3',
+    '4': 'speed4',
+    'K': 'miniPortal',
+    'N': 'bigPortal',
   };
 
   const HAZARDS = { spike: 1, spikeDown: 1, mini: 1 };
-  const PORTALS = { ship: 1, cube: 1, gravUp: 1, gravDown: 1 };
+  const PORTALS = { ship: 1, cube: 1, gravUp: 1, gravDown: 1, speed1: 1, speed2: 1, speed3: 1, speed4: 1, miniPortal: 1, bigPortal: 1 };
 
   function hitbox(type, x, y) {
     switch (type) {
@@ -49,8 +62,10 @@
       case 'spike': return [x + 0.3, y, x + 0.7, y + 0.55];
       case 'spikeDown': return [x + 0.3, y + 0.45, x + 0.7, y + 1];
       case 'mini': return [x + 0.3, y, x + 0.7, y + 0.3];
-      case 'pad': return [x + 0.05, y, x + 0.95, y + 0.3];
+      case 'pad':
+      case 'padPink': return [x + 0.05, y, x + 0.95, y + 0.3];
       case 'orb':
+      case 'orbPink':
       case 'gorb': return [x - 0.1, y - 0.1, x + 1.1, y + 1.1];
       case 'coin': return [x + 0.1, y + 0.1, x + 0.9, y + 0.9];
       default: return [x + 0.1, y - 1, x + 0.9, y + 2]; // Portale: 3 Kacheln hoch
@@ -123,6 +138,8 @@
       x: 0, y: 0, vy: 0,
       gs: 1,              // 1 = normale Schwerkraft, -1 = umgekehrt
       mode: 'cube',       // 'cube' | 'ship'
+      size: 1,            // 1 = normal, 0.5 = Mini
+      speed: 1,           // Tempo-Faktor (Tempo-Portale)
       onGround: true,
       prevHeld: false,
       buffer: 0,
@@ -157,11 +174,12 @@
     s.time += dt;
 
     const y0 = s.y;
-    s.x += C.SPEED * dt;
+    const z = s.size;
+    s.x += C.SPEED * s.speed * dt;
 
     if (s.mode === 'cube') {
       if (s.onGround && (held || s.buffer > 0)) {
-        s.vy = s.gs * C.JUMP_V;
+        s.vy = s.gs * (z < 1 ? C.JUMP_V * C.MINI_JUMP : C.JUMP_V);
         s.onGround = false;
         s.buffer = 0;
         s.events.push('jump');
@@ -190,18 +208,18 @@
         if (o.type !== 'block' || seen.indexOf(o) !== -1) continue;
         seen.push(o);
         const b = o.hb;
-        if (!overlap(s.x, s.y, s.x + 1, s.y + 1, b)) continue;
+        if (!overlap(s.x, s.y, s.x + z, s.y + z, b)) continue;
         const top = b[3];
         const bottom = b[1];
         if ((s.gs === 1 || ship) && s.vy <= 0 && y0 >= top - C.SNAP) {
           s.y = top;
           s.vy = 0;
           if (s.gs === 1) s.onGround = true;
-        } else if ((s.gs === -1 || ship) && s.vy >= 0 && y0 + 1 <= bottom + C.SNAP) {
-          s.y = bottom - 1;
+        } else if ((s.gs === -1 || ship) && s.vy >= 0 && y0 + z <= bottom + C.SNAP) {
+          s.y = bottom - z;
           s.vy = 0;
           if (s.gs === -1) s.onGround = true;
-        } else if (overlap(s.x + C.INNER, s.y + C.INNER, s.x + 1 - C.INNER, s.y + 1 - C.INNER, b)) {
+        } else if (overlap(s.x + C.INNER * z, s.y + C.INNER * z, s.x + z - C.INNER * z, s.y + z - C.INNER * z, b)) {
           s.dead = true;
           s.events.push('die');
           return s;
@@ -215,14 +233,14 @@
       if (s.vy < 0) s.vy = 0;
       if (s.gs === 1) s.onGround = true;
     }
-    if (s.y > C.ROOF - 1) {
-      s.y = C.ROOF - 1;
+    if (s.y > C.ROOF - z) {
+      s.y = C.ROOF - z;
       if (s.vy > 0) s.vy = 0;
       if (s.gs === -1) s.onGround = true;
     }
 
     // Alles andere
-    const hx0 = s.x + C.HAZ, hy0 = s.y + C.HAZ, hx1 = s.x + 1 - C.HAZ, hy1 = s.y + 1 - C.HAZ;
+    const hx0 = s.x + C.HAZ * z, hy0 = s.y + C.HAZ * z, hx1 = s.x + z - C.HAZ * z, hy1 = s.y + z - C.HAZ * z;
     for (let c = c0; c <= c1; c++) {
       const col = level.cols[c];
       for (let k = 0; k < col.length; k++) {
@@ -237,23 +255,23 @@
           }
           continue;
         }
-        if (!overlap(s.x, s.y, s.x + 1, s.y + 1, o.hb)) continue;
+        if (!overlap(s.x, s.y, s.x + z, s.y + z, o.hb)) continue;
         if (t === 'coin') {
           if (!s.coins.has(o.id)) { s.coins.add(o.id); s.events.push('coin'); }
-        } else if (t === 'pad') {
+        } else if (t === 'pad' || t === 'padPink') {
           if (!s.used.has(o.id)) {
             s.used.add(o.id);
-            s.vy = s.gs * C.PAD_V * (ship ? 0.5 : 1);
+            s.vy = s.gs * C.PAD_V * (ship ? 0.5 : 1) * (t === 'padPink' ? C.PINK : 1);
             s.onGround = false;
             s.events.push('pad');
           }
-        } else if (t === 'orb' || t === 'gorb') {
+        } else if (t === 'orb' || t === 'orbPink' || t === 'gorb') {
           if (!s.used.has(o.id) && s.buffer > 0) {
             s.used.add(o.id);
             s.buffer = 0;
             s.onGround = false;
-            if (t === 'orb') {
-              s.vy = s.gs * C.ORB_V * (ship ? 0.6 : 1);
+            if (t === 'orb' || t === 'orbPink') {
+              s.vy = s.gs * C.ORB_V * (ship ? 0.6 : 1) * (t === 'orbPink' ? C.PINK : 1);
             } else {
               s.gs = -s.gs;
               s.vy = -s.gs * C.BLUE_ORB_V;
@@ -269,6 +287,16 @@
             s.gs = -1; s.vy *= 0.5; s.onGround = false; s.events.push('portal');
           } else if (t === 'gravDown' && s.gs === -1) {
             s.gs = 1; s.vy *= 0.5; s.onGround = false; s.events.push('portal');
+          } else if (SPEEDS[t] && s.speed !== SPEEDS[t]) {
+            s.speed = SPEEDS[t]; s.events.push('portal');
+          } else if (t === 'miniPortal' && s.size === 1) {
+            s.size = C.MINI_SIZE;
+            if (s.gs === -1) s.y += 1 - C.MINI_SIZE;   // an der Decke: oben bündig bleiben
+            s.events.push('portal');
+          } else if (t === 'bigPortal' && s.size !== 1) {
+            if (s.gs === -1) s.y -= 1 - s.size;
+            s.size = 1;
+            s.events.push('portal');
           }
         }
       }
@@ -294,7 +322,7 @@
     let held = !!(replay && replay.h0);
     s.prevHeld = held;
     let ti = 0;
-    const limit = maxSteps || Math.ceil((level.length / C.SPEED + 5) / C.DT);
+    const limit = maxSteps || Math.ceil((level.length / (C.SPEED * SPEEDS.speed1) + 5) / C.DT);
     for (let i = 0; i < limit; i++) {
       while (ti < t.length && t[ti] === i) { held = !held; ti++; }
       step(s, level, held, C.DT);
@@ -305,7 +333,7 @@
     return { won: false, steps: limit, x: s.x };
   }
 
-  const Engine = { C, parseLevel, createState, cloneState, step, runReplay, CHAR_TYPES };
+  const Engine = { C, parseLevel, createState, cloneState, step, runReplay, CHAR_TYPES, SPEEDS };
   if (typeof module !== 'undefined' && module.exports) module.exports = Engine;
   else root.Engine = Engine;
 })(this);

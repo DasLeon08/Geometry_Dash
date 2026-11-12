@@ -657,7 +657,10 @@
   function readState(m) {
     const x = num(m.x, 0, 100000), y = num(m.y, -2, 12), r = num(m.r, -1000, 1000);
     if (x === null || y === null || r === null) return null;
-    return { x, y, r, m: m.m === 1 ? 1 : 0, g: m.g === -1 ? -1 : 1, d: m.d === 1 ? 1 : 0, w: m.w === 1 ? 1 : 0, race: num(m.race, 0, 1e9) };
+    return {
+      x, y, r, m: m.m === 1 ? 1 : 0, g: m.g === -1 ? -1 : 1, d: m.d === 1 ? 1 : 0, w: m.w === 1 ? 1 : 0, race: num(m.race, 0, 1e9),
+      z: m.z === 0.5 ? 0.5 : 1, k: num(m.k, 0.5, 2) || 1,
+    };
   }
   function storeRemote(id, st) {
     const old = mp.remote[id];
@@ -713,7 +716,7 @@
       const st = readState(m);
       if (!st || st.race !== mp.raceId) return;
       // an die anderen weitergeben (nur die geprüften Felder)
-      N.send({ t: 's', id: from, race: st.race, x: st.x, y: st.y, r: st.r, m: st.m, g: st.g, d: st.d, w: st.w }, from);
+      N.send({ t: 's', id: from, race: st.race, x: st.x, y: st.y, r: st.r, m: st.m, g: st.g, d: st.d, w: st.w, z: st.z, k: st.k }, from);
       storeRemote(from, st);
     } else if (m.t === 'fin') {
       recordFinish(from, num(m.ms, 0, 36e5), num(m.race, 0, 1e9));
@@ -767,6 +770,7 @@
     const msg = {
       t: 's', race: mp.raceId, x: Math.round(s.x * 100) / 100, y: Math.round(s.y * 100) / 100,
       r: Math.round(game.rot * 100) / 100, m: s.mode === 'ship' ? 1 : 0, g: s.gs, d: s.dead ? 1 : 0, w: s.won ? 1 : 0,
+      z: s.size, k: s.speed,
     };
     if (mp.host) msg.id = mp.me;
     N.send(msg);
@@ -892,7 +896,7 @@
       const r = mp.remote[p.id];
       if (!r || now - r.t > 3000) return;
       const age = Math.min(0.25, (now - r.t) / 1000);
-      const tx = r.x + (r.d || r.w ? 0 : C.SPEED * age);   // kurz vorausrechnen, damit es flüssig aussieht
+      const tx = r.x + (r.d || r.w ? 0 : C.SPEED * (r.k || 1) * age);   // kurz vorausrechnen, damit es flüssig aussieht
       if (r.sx === undefined || Math.abs(tx - r.sx) > 3) { r.sx = tx; r.sy = r.y; }   // Neustart: springen statt gleiten
       r.sx += (tx - r.sx) * 0.35;
       r.sy += (r.y - r.sy) * 0.35;
@@ -900,7 +904,7 @@
       const cols = PLAYER_COLORS[p.color];
       ctx.save();
       ctx.globalAlpha = 0.5;
-      drawAvatar(r.sx, r.sy, r.r, r.m ? 'ship' : 'cube', r.g, cols, false);
+      drawAvatar(r.sx, r.sy, r.r, r.m ? 'ship' : 'cube', r.g, cols, false, r.z);
       ctx.restore();
       ctx.save();
       ctx.globalAlpha = 0.95;
@@ -1126,7 +1130,7 @@
         game.rot += s.gs * 7.0 * dt;
       }
     } else {
-      const target = -Math.atan2(s.vy, C.SPEED) * 0.9;
+      const target = -Math.atan2(s.vy, C.SPEED * s.speed) * 0.9;
       game.rot += (target - game.rot) * Math.min(1, dt * 20);
     }
 
@@ -1288,7 +1292,7 @@
   function drawOrb(o, pulse) {
     const cx = wx(o.x + 0.5), cy = wy(o.y + 0.5);
     const used = game.state && game.state.used.has(o.id);
-    const col = o.type === 'orb' ? '#ffe14a' : '#4aa8ff';
+    const col = o.type === 'orb' ? '#ffe14a' : o.type === 'orbPink' ? '#ff6fd1' : '#4aa8ff';
     ctx.save();
     ctx.globalAlpha = used ? 0.35 : 1;
     ctx.shadowColor = col; ctx.shadowBlur = 20;
@@ -1305,14 +1309,16 @@
 
   function drawPad(o) {
     const cx = wx(o.x + 0.5), by = wy(o.y);
+    const pink = o.type === 'padPink';
+    const col = pink ? '#ff6fd1' : '#ffe14a';
     ctx.save();
-    ctx.shadowColor = '#ffe14a'; ctx.shadowBlur = 16;
-    ctx.fillStyle = '#ffe14a';
+    ctx.shadowColor = col; ctx.shadowBlur = 16;
+    ctx.fillStyle = col;
     ctx.beginPath();
-    ctx.ellipse(cx, by, TS * 0.42, TS * 0.2, 0, Math.PI, 0);
+    ctx.ellipse(cx, by, TS * 0.42, TS * (pink ? 0.15 : 0.2), 0, Math.PI, 0);
     ctx.fill();
     ctx.restore();
-    ctx.fillStyle = 'rgba(255,225,74,0.25)';
+    ctx.fillStyle = pink ? 'rgba(255,111,209,0.25)' : 'rgba(255,225,74,0.25)';
     const h = (time * 2 % 1) * TS * 0.8;
     ctx.fillRect(cx - TS * 0.3, by - h, TS * 0.6, 3);
   }
@@ -1320,8 +1326,28 @@
   const PORTAL_STYLE = {
     ship: ['#ff5ec8', 'Rakete'], cube: ['#7dff9a', 'Würfel'],
     gravUp: ['#ffd84a', '↑'], gravDown: ['#4aa8ff', '↓'],
+    miniPortal: ['#ff9b3b', 'Mini'], bigPortal: ['#5ee6ff', 'Gross'],
   };
+  const SPEED_STYLE = { speed1: ['#ffb03b', 1], speed2: ['#5ee6ff', 2], speed3: ['#7dff9a', 3], speed4: ['#ff5ec8', 4] };
+  /** Tempo-Portal: Rahmen mit 1–4 Pfeilen. */
+  function drawSpeed(o) {
+    const st = SPEED_STYLE[o.type];
+    const cx = wx(o.x + 0.5), cy = wy(o.y + 0.5);
+    ctx.save();
+    ctx.shadowColor = st[0]; ctx.shadowBlur = 18;
+    ctx.strokeStyle = st[0]; ctx.lineWidth = 4;
+    roundRect(cx - TS * 0.55, cy - TS * 1.1, TS * 1.1, TS * 2.2, 12); ctx.stroke();
+    ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const n = st[1], gap = TS * 0.22, x0 = cx - (n - 1) * gap / 2;
+    const shift = ((time * 3) % 1) * 4;
+    for (let i = 0; i < n; i++) {
+      const x = x0 + i * gap + shift - 2;
+      ctx.beginPath(); ctx.moveTo(x - 6, cy - 12); ctx.lineTo(x + 4, cy); ctx.lineTo(x - 6, cy + 12); ctx.stroke();
+    }
+    ctx.restore();
+  }
   function drawPortal(o) {
+    if (SPEED_STYLE[o.type]) { drawSpeed(o); return; }
     const cx = wx(o.x + 0.5), cy = wy(o.y + 0.5);
     const st = PORTAL_STYLE[o.type];
     ctx.save();
@@ -1387,13 +1413,15 @@
   function drawPlayer() {
     const s = game.state;
     if (s.dead) return;
-    drawAvatar(s.x, s.y, game.rot, s.mode, s.gs, PLAYER_COLORS[save.color], true);
+    drawAvatar(s.x, s.y, game.rot, s.mode, s.gs, PLAYER_COLORS[save.color], true, s.size);
   }
 
-  function drawAvatar(x, y, rot, mode, gs, cols, glow) {
-    const cx = wx(x + 0.5), cy = wy(y + 0.5);
+  function drawAvatar(x, y, rot, mode, gs, cols, glow, size) {
+    const z = size || 1;
+    const cx = wx(x + z / 2), cy = wy(y + z / 2);
     ctx.save();
     ctx.translate(cx, cy);
+    if (z !== 1) ctx.scale(z, z);
     if (glow) { ctx.shadowColor = cols[0]; ctx.shadowBlur = 16; }
     if (mode === 'cube') {
       ctx.rotate(rot);
@@ -1546,8 +1574,8 @@
     switch (o.type) {
       case 'block': drawBlock(o, colors); break;
       case 'spike': case 'spikeDown': case 'mini': drawSpike(o, colors); break;
-      case 'orb': case 'gorb': drawOrb(o, pulse); break;
-      case 'pad': drawPad(o); break;
+      case 'orb': case 'gorb': case 'orbPink': drawOrb(o, pulse); break;
+      case 'pad': case 'padPink': drawPad(o); break;
       case 'coin': drawCoin(o); break;
       default: drawPortal(o);
     }

@@ -13,7 +13,8 @@ Rakete durch Tunnel und drehst die Schwerkraft um.
   - Mittel: *Neon-Himmel*, *Tiefsee*, *Vulkan*, *Polarlicht*, *Turbo-Tunnel*
   - Schwer: *Umkehr*, *Schattenwerk*, *Sternenstaub*, *Glitch*
   - Extrem: *Nachtschicht*, *Neon-Kern*
-- Würfel- und Raketen-Modus, Sprungfelder, gelbe/blaue Ringe, Schwerkraft-Portale
+- Würfel- und Raketen-Modus, Sprungfelder, gelbe/blaue Ringe, Schwerkraft-Portale;
+  im Editor zusätzlich rosa Sprungfeld/Ring, Tempo-Portale (4 Stufen) und Mini-Portal
 - 3 Münzen pro Level, Bestwerte in % (Normal und Übung)
 - Übungsmodus mit automatischen und manuellen Checkpoints
 - Selbst erzeugte Musik und Sounds (Web Audio, keine Audiodateien): jeder Song mit
@@ -205,6 +206,8 @@ legt die Liste `ORDER` am Ende der Datei fest. Nach jeder Änderung prüfen, ob 
 ```bash
 node tools/verify-levels.js
 ```
+
+`node tools/test-objects.js` prüft die Objekte aus dem Editor (Tempo, rosa Feld/Ring, Mini).
 
 Das Skript probiert per Breitensuche alle Eingabefolgen durch (mit höchstens
 30 Eingaben pro Sekunde, also menschlich machbar) und zeigt bei einem Fehler die

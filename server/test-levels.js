@@ -116,6 +116,12 @@ async function suite(label, store) {
     r = await pub(Object.assign({}, base, { name: 'Stachelfeld 2', rows: SPIKES, replay: late }));
     ok(r.status === 400 && r.json.error === 'unbeaten', 'verspäteter (gefälschter) Lauf -> abgelehnt');
 
+    // Neue Objekte (Etappe 3): Tempo, rosa Feld, Mini/Normal
+    const NEW = rowsWith(60, [['3', 4, 1], ['p', 14, 0], ['K', 30, 1], ['c', 40, 1], ['N', 45, 1], ['1', 50, 1]]);
+    r = await pub(Object.assign({}, base, { name: 'Neue Teile', rows: NEW, replay: { h0: false, t: [] } }));
+    ok(r.status === 201, 'Level mit neuen Objekten veröffentlicht');
+    await request(port, 'POST', '/api/admin/levels/' + r.json.id + '/delete', {}, { 'x-admin-token': 'admin-geheim-123' });
+
     // Prüfungen
     r = await pub(Object.assign({}, base, { name: 'Fick dich', rows: COINS, replay: { h0: false, t: [] } }));
     ok(r.status === 400 && r.json.error === 'name', 'Schimpfwort im Namen -> abgelehnt');

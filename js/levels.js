@@ -10,6 +10,9 @@
  *   o  gelber Ring     b  blauer Ring (Schwerkraft umdrehen)
  *   c  Münze           S  Raketen-Portal  C  Würfel-Portal
  *   U  Schwerkraft-Portal (nach oben)     D  Schwerkraft-Portal (nach unten)
+ *   p  rosa Sprungfeld   r  rosa Ring (beide springen weniger hoch)
+ *   1–4 Tempo-Portale (langsam, normal, schnell, sehr schnell)
+ *   K  Mini-Portal (halbe Grösse)          N  Normal-Portal (wieder gross)
  *
  * Portale sind 3 Kacheln hoch und werden auf die mittlere Kachel gesetzt.
  * Nach jeder Änderung prüfen:  node tools/verify-levels.js
