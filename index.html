@@ -417,6 +417,88 @@
     #mp .tile svg.i { width: 22px; height: 22px; }
     .finish-bar { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; gap: 10px; }
 
+    /* ---------- Community & Editor ---------- */
+    .mp-open.cm { background: var(--grape); }
+    .panel.wide { width: min(760px, 100%); }
+    .tabs { display: flex; gap: 8px; justify-content: center; margin: 12px 0; }
+    .tabs button {
+      padding: 6px 16px; border-radius: 999px; border: 3px solid var(--ink); background: #fff; color: var(--ink);
+      font-weight: 700; font-size: 15px; box-shadow: 0 4px 0 var(--ink);
+    }
+    .tabs button.on { background: var(--sun); }
+    .cm-list { display: flex; flex-direction: column; gap: 8px; max-height: 46vh; overflow-y: auto; padding: 4px 4px 8px; text-align: left; }
+    .cm-item {
+      display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 18px; background: #fff;
+      border: 3px solid var(--ink); box-shadow: 0 4px 0 var(--ink); color: var(--ink);
+    }
+    .cm-item canvas { width: 120px; height: 60px; border-radius: 12px; border: 3px solid var(--ink); flex: none; display: block; }
+    .cm-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .cm-info b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cm-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; font-weight: 600; color: var(--sub); align-items: center; }
+    .cm-meta .chip { padding: 1px 8px; font-size: 11px; border-width: 2px; }
+    .chip.ok { background: #7dff9a; }
+    .chip.pub { background: var(--sky); color: #fff; }
+    .cm-actions { display: flex; gap: 6px; flex: none; }
+    .cm-actions .icon-btn { width: 42px; height: 42px; }
+    .cm-actions .icon-btn svg.i { width: 18px; height: 18px; }
+    .cm-actions .icon-btn.go { background: var(--sun); }
+    .cm-empty { padding: 18px; text-align: center; color: var(--sub); font-weight: 600; }
+    .cm-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .cm-tools .input { height: 42px; font-size: 15px; flex: 1; min-width: 140px; }
+    .cm-tools .btn-go { width: auto; height: 46px; padding: 0 16px; font-size: 15px; }
+    .cm-pager { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 6px; font-weight: 700; color: var(--sub); }
+    .cm-pager .icon-btn { width: 38px; height: 38px; }
+
+    #editor { position: fixed; inset: 0; z-index: 8; pointer-events: none; }
+    #editor > * { pointer-events: auto; }
+    .ed-top {
+      position: absolute; top: 8px; left: 8px; right: 8px; display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; border-radius: 18px; background: var(--cream); border: 4px solid var(--ink); box-shadow: 0 5px 0 var(--ink);
+      color: var(--ink);
+    }
+    .ed-top .icon-btn { width: 42px; height: 42px; flex: none; }
+    .ed-top .icon-btn svg.i { width: 18px; height: 18px; }
+    .ed-top .icon-btn:disabled { opacity: .35; }
+    .ed-name { font-weight: 700; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
+    .ed-spacer { flex: 1; }
+    .ed-top .chip { flex: none; }
+    .ed-top .btn-go { width: auto; height: 44px; padding: 0 14px; font-size: 15px; flex: none; border-radius: 14px; }
+    .ed-top .btn-go.secondary { background: linear-gradient(180deg, #8fe3ff, var(--sky)); }
+    .ed-top .pill-btn { height: 42px; flex: none; }
+    .ed-bottom {
+      position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; flex-direction: column; gap: 6px;
+      padding: 6px 8px; border-radius: 18px; background: var(--cream); border: 4px solid var(--ink); box-shadow: 0 5px 0 var(--ink);
+    }
+    .ed-palette { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; touch-action: pan-x; }
+    .ed-tool {
+      flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 58px; padding: 4px 2px;
+      border-radius: 12px; border: 3px solid var(--ink); background: #fff; color: var(--ink); font-size: 10px; font-weight: 700;
+    }
+    .ed-tool canvas { width: 32px; height: 32px; display: block; }
+    .ed-tool.on { background: var(--sun); transform: translateY(-2px); box-shadow: 0 3px 0 var(--ink); }
+    .ed-scroll { width: 100%; accent-color: #b980ff; }
+    .ed-pos { font-size: 11px; font-weight: 700; color: var(--sub); text-align: center; }
+    #edSettings .panel { width: min(520px, 100%); }
+    .themes { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+    .theme { height: 34px; border-radius: 10px; border: 3px solid var(--ink); }
+    .theme.on { outline: 4px solid var(--sun); outline-offset: 1px; }
+    .select { height: 46px; border-radius: 14px; border: 4px solid var(--ink); background: #fff; font: inherit; font-weight: 600; color: var(--ink); padding: 0 10px; flex: 1; }
+    @media (max-height: 560px) {
+      .ed-top { top: 4px; padding: 3px 6px; gap: 5px; border-width: 3px; }
+      .ed-top .icon-btn, .ed-top .pill-btn { width: 34px; height: 34px; }
+      .ed-top .pill-btn { width: auto; padding: 0 8px; font-size: 12px; }
+      .ed-top .btn-go { height: 36px; font-size: 13px; padding: 0 10px; }
+      .ed-name { font-size: 14px; }
+      .ed-bottom { bottom: 4px; padding: 3px 6px; gap: 2px; border-width: 3px; }
+      .ed-tool { width: 56px; font-size: 9px; padding: 2px; }
+      .ed-tool canvas { width: 24px; height: 24px; }
+      .ed-pos { display: none; }
+      .cm-list { max-height: 52vh; }
+      .cm-item canvas { width: 90px; height: 45px; }
+      .tabs { margin: 6px 0; }
+    }
+    @media (max-width: 720px) { .ed-top .chip { display: none; } }
+
     /* ---------- Hochformat-Hinweis ---------- */
     #rotate { z-index: 50; background: #2b0f6b; flex-direction: column; text-align: center; gap: 12px; font-size: 20px; font-weight: 600; }
     #rotate .phone { font-size: 56px; animation: tilt 1.6s ease-in-out infinite; }
@@ -495,6 +577,16 @@
     <symbol id="i-jump" viewBox="0 0 24 24"><path d="M12 3.5a1 1 0 0 1 .7.3l6 6a1 1 0 0 1-.7 1.7h-3.5V19a1.5 1.5 0 0 1-1.5 1.5h-2A1.5 1.5 0 0 1 9.5 19v-7.5H6a1 1 0 0 1-.7-1.7l6-6a1 1 0 0 1 .7-.3z"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2zm0 2a1.2 1.2 0 0 1 1.2 1.2v3.9l2.7 2.7a1.2 1.2 0 0 1-1.7 1.7l-3-3a1.2 1.2 0 0 1-.4-.9V7.6A1.2 1.2 0 0 1 12 6.4z"/></symbol>
     <symbol id="i-users" viewBox="0 0 24 24"><path d="M9 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm8 1.5a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM9 13.5c3.6 0 7 1.8 7 4.5v1a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 2 19v-1c0-2.7 3.4-4.5 7-4.5zm8.6.6c2.6.3 4.4 1.7 4.4 3.6v1.1a1.2 1.2 0 0 1-1.2 1.2h-2.6c.5-.4.8-1 .8-1.6V18c0-1.5-.6-2.8-1.4-3.9z"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M15.6 3.6a2.2 2.2 0 0 1 3.1 0l1.7 1.7a2.2 2.2 0 0 1 0 3.1L9.6 19.2 4 20.5a.5.5 0 0 1-.6-.6l1.3-5.6L15.6 3.6z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M9 3h6a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1l-1 13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4a1 1 0 0 1 0-2h4V4a1 1 0 0 1 1-1zm1 6v9h1.6V9H10zm2.4 0v9H14V9h-1.6z"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9.7 4.3a1 1 0 0 1 0 1.4L7.4 8H14a6 6 0 1 1 0 12h-3a1 1 0 1 1 0-2h3a4 4 0 1 0 0-8H7.4l2.3 2.3a1 1 0 1 1-1.4 1.4l-4-4a1 1 0 0 1 0-1.4l4-4a1 1 0 0 1 1.4 0z"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="M14.3 4.3a1 1 0 0 0 0 1.4L16.6 8H10a6 6 0 1 0 0 12h3a1 1 0 1 0 0-2h-3a4 4 0 1 1 0-8h6.6l-2.3 2.3a1 1 0 1 0 1.4 1.4l4-4a1 1 0 0 0 0-1.4l-4-4a1 1 0 0 0-1.4 0z"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M10.6 2h2.8l.5 2.6c.7.2 1.3.6 1.9 1l2.5-.9 1.4 2.4-2 1.7a7 7 0 0 1 0 2.4l2 1.7-1.4 2.4-2.5-.9c-.6.4-1.2.8-1.9 1l-.5 2.6h-2.8l-.5-2.6c-.7-.2-1.3-.6-1.9-1l-2.5.9-1.4-2.4 2-1.7a7 7 0 0 1 0-2.4l-2-1.7 1.4-2.4 2.5.9c.6-.4 1.2-.8 1.9-1L10.6 2zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 3a1 1 0 0 1 .7.3l5 5a1 1 0 0 1-1.4 1.4L13 6.4V15a1 1 0 1 1-2 0V6.4L7.7 9.7a1 1 0 0 1-1.4-1.4l5-5A1 1 0 0 1 12 3zM4 17a1 1 0 0 1 1 1v1h14v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 4a1.5 1.5 0 0 1 1.5 1.5v5h5a1.5 1.5 0 0 1 0 3h-5v5a1.5 1.5 0 0 1-3 0v-5h-5a1.5 1.5 0 0 1 0-3h5v-5A1.5 1.5 0 0 1 12 4z"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm-1.4 2.6A7.6 7.6 0 0 0 4.5 11h3.3c.1-2.3.6-4.6 1.4-6.4h1.4zm2.8 0c.8 1.8 1.3 4.1 1.4 6.4h3.3a7.6 7.6 0 0 0-4.7-6.4zM12 4.6c-.9 1.4-1.6 3.7-1.8 6.4h3.6c-.2-2.7-.9-5-1.8-6.4zM4.5 13a7.6 7.6 0 0 0 6.1 6.4c-.8-1.8-1.3-4.1-1.4-6.4H4.5zm5.7 0c.2 2.7.9 5 1.8 6.4.9-1.4 1.6-3.7 1.8-6.4h-3.6zm5.6 0c-.1 2.3-.6 4.6-1.4 6.4a7.6 7.6 0 0 0 4.7-6.4h-3.3z"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.5 4.6 13.4A5 5 0 0 1 12 6.6a5 5 0 0 1 7.4 6.8L12 20.5z"/></symbol>
+    <symbol id="i-flagx" viewBox="0 0 24 24"><path d="M5 2.8a1.2 1.2 0 0 1 1.2 1.2v.3c3-1.6 5.6.9 8.6-.4 1.1-.5 2.4.3 2.4 1.5v7.4c0 .6-.3 1.1-.8 1.3-3.6 1.7-6.6-1.1-10.2.6V21a1.2 1.2 0 1 1-2.4 0V4A1.2 1.2 0 0 1 5 2.8z"/></symbol>
     <symbol id="i-copy" viewBox="0 0 24 24"><path d="M9 3h9a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-1v-2.4h1a.6.6 0 0 0 .6-.6V6a.6.6 0 0 0-.6-.6H9a.6.6 0 0 0-.6.6v1H6V6a3 3 0 0 1 3-3zM6 8h9a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-7a3 3 0 0 1 3-3z"/></symbol>
     <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 3h10a1 1 0 0 1 1 1v1h2.5a1 1 0 0 1 1 1v1.5a4.5 4.5 0 0 1-4.3 4.5A6 6 0 0 1 13.2 15v2.6h2.6a1.2 1.2 0 1 1 0 2.4H8.2a1.2 1.2 0 1 1 0-2.4h2.6V15a6 6 0 0 1-4-3A4.5 4.5 0 0 1 2.5 7.5V6a1 1 0 0 1 1-1H6V4a1 1 0 0 1 1-1zM4.7 7.2v.3a2.3 2.3 0 0 0 1.4 2.1A6 6 0 0 1 6 8.5V7.2H4.7zm14.6 0H18v1.3l-.1 1.1a2.3 2.3 0 0 0 1.4-2.1v-.3z"/></symbol>
   </svg>
@@ -510,6 +602,7 @@
           <p class="tagline">Spring im Takt, flieg durch Tunnel, dreh die Schwerkraft um.</p>
         </div>
         <div class="menu-actions">
+          <button class="mp-open cm" id="cmBtn"><svg class="i"><use href="#i-edit"/></svg>Bauen</button>
           <button class="mp-open" id="mpBtn"><svg class="i"><use href="#i-users"/></svg>Mehrspieler</button>
           <div class="pager">
             <button class="icon-btn" id="pgPrev" aria-label="Vorherige Seite"><svg class="i"><use href="#i-left"/></svg></button>
@@ -538,6 +631,90 @@
   <div id="practiceBar" class="practice-bar hidden">
     <button class="pill-btn" id="cpAdd"><svg class="i"><use href="#i-diamond"/></svg>Checkpoint</button>
     <button class="pill-btn del" id="cpDel"><svg class="i"><use href="#i-x"/></svg>Löschen</button>
+  </div>
+
+  <!-- Community: Online-Level und eigene Level -->
+  <div id="community" class="overlay dim hidden">
+    <div class="panel wide">
+      <div class="eyebrow">Community</div>
+      <div class="title">Level von Spielern</div>
+      <div class="tabs">
+        <button id="cmTabFind" class="on"><svg class="i"><use href="#i-globe"/></svg> Entdecken</button>
+        <button id="cmTabMine"><svg class="i"><use href="#i-edit"/></svg> Meine Level</button>
+      </div>
+      <div id="cmFind">
+        <div class="cm-tools">
+          <input class="input" id="cmSearch" maxlength="30" placeholder="Suchen …" autocomplete="off" spellcheck="false">
+          <div class="seg" id="cmSort">
+            <button data-sort="neu" class="on">Neu</button>
+            <button data-sort="beliebt">Beliebt</button>
+            <button data-sort="gespielt">Gespielt</button>
+          </div>
+        </div>
+        <div class="cm-list" id="cmFindList"></div>
+        <div class="cm-pager">
+          <button class="icon-btn" id="cmPrev" aria-label="Zurück"><svg class="i"><use href="#i-left"/></svg></button>
+          <span id="cmPage">Seite 1</span>
+          <button class="icon-btn" id="cmNext" aria-label="Weiter"><svg class="i"><use href="#i-right"/></svg></button>
+        </div>
+      </div>
+      <div id="cmMine" class="hidden">
+        <button class="btn-go" id="cmNew"><svg class="i"><use href="#i-plus"/></svg>Neues Level bauen</button>
+        <div class="cm-list" id="cmMineList" style="margin-top: 10px"></div>
+      </div>
+      <div class="status" id="cmStatus"></div>
+      <div class="tiles" style="grid-template-columns: 1fr">
+        <button class="tile" id="cmBack"><svg class="i"><use href="#i-home"/></svg>Zurück</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Level-Editor -->
+  <div id="editor" class="hidden">
+    <div class="ed-top">
+      <button class="icon-btn" id="edBack" title="Zurück zu Meine Level" aria-label="Zurück"><svg class="i"><use href="#i-home"/></svg></button>
+      <div class="ed-name" id="edName">Mein Level</div>
+      <span class="chip" id="edState">Noch nicht geschafft</span>
+      <div class="ed-spacer"></div>
+      <button class="icon-btn" id="edUndo" title="Rückgängig (Strg+Z)" aria-label="Rückgängig"><svg class="i"><use href="#i-undo"/></svg></button>
+      <button class="icon-btn" id="edRedo" title="Wiederholen (Strg+Y)" aria-label="Wiederholen"><svg class="i"><use href="#i-redo"/></svg></button>
+      <button class="icon-btn" id="edSettingsBtn" title="Einstellungen" aria-label="Einstellungen"><svg class="i"><use href="#i-gear"/></svg></button>
+      <button class="pill-btn" id="edTestHere" title="Ab der aktuellen Stelle testen (zählt nicht)">Ab hier</button>
+      <button class="btn-go" id="edTest" title="Von Anfang an testen"><svg class="i"><use href="#i-play"/></svg>Testen</button>
+      <button class="btn-go secondary" id="edPublish" title="Erst möglich, wenn du das Level von Anfang an geschafft hast"><svg class="i"><use href="#i-upload"/></svg>Veröffentlichen</button>
+    </div>
+    <div class="ed-bottom">
+      <div class="ed-palette" id="edPalette"></div>
+      <input class="ed-scroll" type="range" id="edScroll" min="0" max="100" value="0" aria-label="Position im Level">
+      <div class="ed-pos" id="edPos">Spalte 0</div>
+    </div>
+  </div>
+  <div id="edSettings" class="overlay dim hidden">
+    <div class="panel">
+      <div class="eyebrow">Level-Einstellungen</div>
+      <div class="field">
+        <label for="edNameInput">Name</label>
+        <input class="input" id="edNameInput" maxlength="24" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label>Farben</label>
+        <div class="themes" id="edThemes"></div>
+      </div>
+      <div class="field">
+        <label for="edMusic">Musik</label>
+        <div class="row">
+          <select class="select" id="edMusic"></select>
+          <button class="icon-btn" id="edMusicPlay" aria-label="Anhören"><svg class="i"><use href="#i-play"/></svg></button>
+        </div>
+      </div>
+      <div class="setting">
+        <span>Schwierigkeit</span>
+        <div class="seg" id="edDiff">
+          <button data-d="1">Leicht</button><button data-d="2">Mittel</button><button data-d="3">Schwer</button><button data-d="4">Extrem</button>
+        </div>
+      </div>
+      <button class="btn-go" id="edSettingsDone">Fertig</button>
+    </div>
   </div>
 
   <!-- Mehrspieler -->
@@ -655,5 +832,6 @@
   <script src="js/config.js"></script>
   <script src="js/multiplayer.js"></script>
   <script src="js/game.js"></script>
+  <script src="js/editor.js"></script>
 </body>
 </html>

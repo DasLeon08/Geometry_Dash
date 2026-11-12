@@ -281,7 +281,31 @@
     return s;
   }
 
-  const Engine = { C, parseLevel, createState, cloneState, step, CHAR_TYPES };
+  /**
+   * Einen aufgezeichneten Lauf nachspielen (Beweis, dass ein Level geschafft wurde).
+   * replay = { h0: Taste am Anfang gedrückt?, t: [Schritte, vor denen die Taste wechselt] }
+   * Weil die Physik ohne Zufall mit festem Zeitschritt rechnet, ergibt dieselbe
+   * Eingabe überall exakt denselben Lauf.
+   */
+  function runReplay(def, replay, maxSteps) {
+    const level = parseLevel(def);
+    const s = createState();
+    const t = (replay && Array.isArray(replay.t)) ? replay.t : [];
+    let held = !!(replay && replay.h0);
+    s.prevHeld = held;
+    let ti = 0;
+    const limit = maxSteps || Math.ceil((level.length / C.SPEED + 5) / C.DT);
+    for (let i = 0; i < limit; i++) {
+      while (ti < t.length && t[ti] === i) { held = !held; ti++; }
+      step(s, level, held, C.DT);
+      s.events.length = 0;
+      if (s.won) return { won: true, steps: i + 1, coins: s.coins.size };
+      if (s.dead) return { won: false, dead: true, steps: i + 1, x: s.x };
+    }
+    return { won: false, steps: limit, x: s.x };
+  }
+
+  const Engine = { C, parseLevel, createState, cloneState, step, runReplay, CHAR_TYPES };
   if (typeof module !== 'undefined' && module.exports) module.exports = Engine;
   else root.Engine = Engine;
 })(this);

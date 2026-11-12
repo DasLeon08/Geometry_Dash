@@ -60,7 +60,12 @@
   function writeSave() {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* privat / blockiert */ }
   }
+  const scratchStats = {};   // Test-Läufe im Editor: Werte nur im Speicher
   function levelSave(id) {
+    if (String(id).indexOf('draft:') === 0) {
+      if (!scratchStats[id]) scratchStats[id] = { best: 0, practice: 0, attempts: 0, coins: [], done: false };
+      return scratchStats[id];
+    }
     if (!save.levels[id]) save.levels[id] = { best: 0, practice: 0, attempts: 0, coins: [], done: false };
     return save.levels[id];
   }
@@ -212,8 +217,9 @@
     // Abwechslungsreichsten Ausschnitt wählen (Blöcke, ein paar Stacheln, Extras)
     const cols = Math.ceil(w / ts);
     const maxY = h < 90 ? 2 : 4;
-    let bestX = 14, bestN = -1;
-    for (let x = 14; x < Math.min(lvl.length - cols, 160); x += 2) {
+    const from = lvl.length < 140 ? 0 : 14;   // kurze (eigene) Level von vorne zeigen
+    let bestX = from, bestN = -1;
+    for (let x = from; x < Math.min(lvl.length - cols, 160); x += 2) {
       let blocks = 0, spikes = 0, extras = 0;
       lvl.objects.forEach((o) => {
         if (o.x < x || o.x >= x + cols || o.y > maxY) return;
@@ -441,7 +447,7 @@
     show('pause', game.paused);
     if (game.paused) {
       const pct = progress();
-      const def = window.LEVELS[game.levelIndex];
+      const def = game.level.def;
       const sv = levelSave(def.id);
       $('pauseRing').style.setProperty('--p', pct);
       $('pausePct').textContent = pct + '%';
@@ -451,8 +457,9 @@
       show('pausePractice', game.practice);
       $('togglePracticeBtn').querySelector('span').textContent = game.practice ? 'Normal spielen' : 'Übungsmodus';
       $('togglePracticeBtn').classList.toggle('on', game.practice);
-      show('togglePracticeBtn', !game.race);
-      $('menuBtn').lastChild.textContent = game.race ? 'Lobby' : 'Menü';
+      show('togglePracticeBtn', !game.race && !game.custom);
+      $('menuBtn').lastChild.textContent = game.race ? 'Lobby' : game.custom ? (game.custom.label || 'Zurück') : 'Menü';
+      if (game.custom) $('pauseLevel').textContent = game.level.def.name;
       A.pauseAll();
     } else {
       // genau dort weitermachen, wo pausiert wurde (Spiel und Musik)
@@ -465,7 +472,7 @@
   $('resumeBtn').onclick = () => togglePause();
   $('restartBtn').onclick = () => { game.paused = false; show('pause', false); blurActive(); restartLevel(); };
   $('togglePracticeBtn').onclick = () => { show('pause', false); blurActive(); startLevel(game.levelIndex, !game.practice); };
-  $('menuBtn').onclick = () => { if (game.race) toLobby(); else goMenu(); };
+  $('menuBtn').onclick = () => { if (game.race) toLobby(); else if (game.custom) leaveCustom({ won: false }); else goMenu(); };
   $('winMenuBtn').onclick = goMenu;
   $('againBtn').onclick = () => { blurActive(); startLevel(game.levelIndex, game.practice); };
   $('nextBtn').onclick = () => { blurActive(); startLevel((game.levelIndex + 1) % window.LEVELS.length, false); };
@@ -923,8 +930,37 @@
     A.stopMusic();
     game.race = !!race;
     game.countdown = race && !noCountdown ? COUNTDOWN : 0;
+    game.custom = null;
     game.levelIndex = index;
     game.level = E.parseLevel(window.LEVELS[index]);
+    startPrepared(practice);
+  }
+
+  /**
+   * Eigenes Level spielen (Editor-Test oder Online-Level).
+   * opts: { startX, onExit(result), label } – result = { won, replay, fromStart }
+   */
+  function startCustom(def, opts) {
+    A.unlock();
+    A.stopMusic();
+    game.race = false;
+    game.countdown = 0;
+    game.custom = Object.assign({ startX: 0 }, opts || {});
+    game.levelIndex = -1;
+    game.level = E.parseLevel(def);
+    startPrepared(false);
+  }
+  function leaveCustom(result) {
+    const c = game.custom;
+    game.custom = null;
+    A.stopMusic(true);
+    show('hud', false); show('practiceBar', false); show('pause', false); show('win', false);
+    game.paused = false;
+    if (c && c.onExit) c.onExit(result || { won: false });
+    else goMenu();
+  }
+
+  function startPrepared(practice) {
     setTheme(game.level.def);
     game.practice = practice;
     game.checkpoints = [];
@@ -961,8 +997,12 @@
       game.jumps = game.practice ? game.jumps : 0;
       game.attemptStartX = 0;
       game.state.coins = new Set();
+      if (game.custom && game.custom.startX > 0) { game.state.x = game.custom.startX; game.attemptStartX = game.custom.startX; }
     }
     game.state.prevHeld = held;      // gehaltene Taste nicht als neuen Klick zählen
+    // Aufnahme des Laufs (nur von Anfang an, normaler Modus): in welchem Schritt wechselt die Taste?
+    game.rec = !game.practice && !cp && !(game.custom && game.custom.startX > 0)
+      ? { h0: held, last: held, steps: 0, t: [] } : null;
     game.deathTimer = 0;
     game.lastAutoCp = game.state.time;
     // Im Übungsmodus läuft die Musik beim Sterben einfach weiter; beim Countdown startet sie erst bei "LOS"
@@ -1056,6 +1096,10 @@
       game.deathTimer -= dt;
       if (game.deathTimer <= 0) restartAttempt();
       return;
+    }
+    if (game.rec) {
+      if (held !== game.rec.last) { game.rec.t.push(game.rec.steps); game.rec.last = held; }
+      game.rec.steps++;
     }
     E.step(s, game.level, held, dt);
     for (let i = 0; i < s.events.length; i++) {
@@ -1487,12 +1531,37 @@
     outlinedText('Versuch ' + game.attempts, x, wy(5), 46, '#fff', 8);
   }
 
+  /** Alle sichtbaren Objekte eines Levels zeichnen. */
+  function drawObjects(level, colors, pulse) {
+    const objs = level.objects;
+    const left = camX - 3, right = camX + viewW / TS + 3;
+    let lo = 0, hi = objs.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (objs[mid].x < left) lo = mid + 1; else hi = mid; }
+    for (let i = lo; i < objs.length && objs[i].x <= right; i++) drawObject(objs[i], colors, pulse);
+  }
+  function drawObject(o, colors, pulse) {
+    switch (o.type) {
+      case 'block': drawBlock(o, colors); break;
+      case 'spike': case 'spikeDown': case 'mini': drawSpike(o, colors); break;
+      case 'orb': case 'gorb': drawOrb(o, pulse); break;
+      case 'pad': drawPad(o); break;
+      case 'coin': drawCoin(o); break;
+      default: drawPortal(o);
+    }
+  }
+
   function render() {
+    // Der Editor kann den Boden höher legen, damit alle Reihen zwischen seine Leisten passen
+    groundY = game.groundOverride != null ? game.groundOverride : Math.round(viewH / 2 + 200);
     const colors = game.level ? game.level.def.colors : window.LEVELS[0].colors;
     const pulse = 1 - A.beat();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
+    if (game.scene === 'editor' && window.NeonEditor) {
+      window.NeonEditor.render();
+      return;
+    }
     if (game.scene === 'menu' || !game.state) {
       camX = time * 4;
       drawBackground(colors, pulse * pulse);
@@ -1515,22 +1584,7 @@
     drawAttemptText();
     drawGround(colors);
 
-    // sichtbare Objekte
-    const objs = game.level.objects;
-    const left = camX - 3, right = camX + viewW / TS + 3;
-    let lo = 0, hi = objs.length;
-    while (lo < hi) { const mid = (lo + hi) >> 1; if (objs[mid].x < left) lo = mid + 1; else hi = mid; }
-    for (let i = lo; i < objs.length && objs[i].x <= right; i++) {
-      const o = objs[i];
-      switch (o.type) {
-        case 'block': drawBlock(o, colors); break;
-        case 'spike': case 'spikeDown': case 'mini': drawSpike(o, colors); break;
-        case 'orb': case 'gorb': drawOrb(o, pulse); break;
-        case 'pad': drawPad(o); break;
-        case 'coin': drawCoin(o); break;
-        default: drawPortal(o);
-      }
-    }
+    drawObjects(game.level, colors, pulse);
     drawEnd(colors);
     drawCheckpoints();
     drawParticles();
@@ -1580,7 +1634,11 @@
       game.winTimer -= dt;
       if (game.winTimer <= 0 && $('win').classList.contains('hidden') && !game.winShown) {
         game.winShown = true;
-        if (game.race) mpAfterFinish(); else show('win', true);
+        if (game.race) mpAfterFinish();
+        else if (game.custom) {
+          const r = game.rec;
+          leaveCustom({ won: true, fromStart: !!r, replay: r ? { h0: r.h0, t: r.t.slice(), steps: r.steps } : null, coins: game.state.coins.size });
+        } else show('win', true);
       }
     }
     if (!game.paused) updateParticles(dt);
@@ -1598,5 +1656,16 @@
   requestAnimationFrame(frame);
 
   // für Tests / Einbettung
-  window.NeonHop = { game, startLevel, goMenu, mp, totalScore, joinRoom: (code) => mpJoinCode(code) };
+  window.NeonHop = {
+    game, startLevel, startCustom, goMenu, mp, totalScore, save, writeSave, toast, show, drawCardArt, setTheme,
+    joinRoom: (code) => mpJoinCode(code),
+    // Zeichnen für den Editor (benutzt dieselbe Kamera wie das Spiel)
+    gfx: {
+      ctx, TS, get viewW() { return viewW; }, get viewH() { return viewH; }, get groundY() { return groundY; },
+      get scale() { return scale; }, get camX() { return camX; }, set camX(v) { camX = v; },
+      wx, wy, drawBackground, drawGround, drawObjects, drawObject, drawEnd, drawAvatar, outlinedText, roundRect,
+      playerColors: () => PLAYER_COLORS[save.color], INK, FONT,
+      begin() { ctx.setTransform(scale, 0, 0, scale, 0, 0); },
+    },
+  };
 })();
