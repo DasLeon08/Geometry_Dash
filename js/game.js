@@ -42,6 +42,7 @@
     data.muted = raw.muted === true;
     data.name = typeof raw.name === 'string' ? raw.name.replace(/[\u0000-\u001f<>]/g, '').slice(0, 16) : '';
     data.nameTyped = raw.nameTyped === true;
+    data.fxReduced = raw.fxReduced === true;
     const levels = raw.levels && typeof raw.levels === 'object' ? raw.levels : {};
     // eingebaute Level plus höchstens 200 Online-Level ("online:<id>")
     const ids = window.LEVELS.map((def) => def.id)
@@ -99,6 +100,8 @@
   const game = {
     scene: 'menu',        // 'menu' | 'play' | 'win'
     paused: false,
+    trail: [],
+    wasGround: true,
     levelIndex: 0,
     level: null,
     state: null,
@@ -123,12 +126,14 @@
 
   // Hintergrund-Formen (zufällig, aber fest)
   const bgShapes = [];
+  const bgStars = [];
   (function () {
     let seed = 7;
     const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
     for (let i = 0; i < 40; i++) {
       bgShapes.push({ x: rnd() * 2400, y: rnd() * 420, s: 30 + rnd() * 110, r: rnd() * Math.PI, d: 0.1 + rnd() * 0.25 });
     }
+    for (let i = 0; i < 70; i++) bgStars.push({ x: rnd() * 2400, y: rnd() * 440, r: 0.8 + rnd() * 1.8, ph: rnd() * 6.3 });
   })();
 
   // ---------------------------------------------------------------------
@@ -419,6 +424,13 @@
     updateSoundBtn();
   }
 
+  function updateFxBtn() {
+    $('fxBtn').lastChild.textContent = save.fxReduced ? 'Effekte: reduziert' : 'Effekte: voll';
+    $('fxBtn').title = 'Weniger Blitze, Wackeln und Teilchen (für ältere Handys oder lichtempfindliche Spieler)';
+  }
+  $('fxBtn').onclick = () => { save.fxReduced = !save.fxReduced; writeSave(); updateFxBtn(); A.sfx('click'); };
+  updateFxBtn();
+
   function updateSoundBtn() {
     $('soundBtn').innerHTML = icon(save.muted ? 'mute' : 'sound');
     $('soundBtn').title = save.muted ? 'Ton ist aus' : 'Ton ist an';
@@ -434,7 +446,12 @@
   function blurActive() { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
 
   function goMenu() {
-    if (game.level) focusLevel = game.levelIndex;
+    if (game.level && game.levelIndex >= 0) focusLevel = game.levelIndex;
+    // auch aus dem Editor oder einem eigenen Level heraus sauber ins Menü (z.B. bei einer Toki-Einladung)
+    if (game.scene === 'editor' && window.NeonEditor) NeonEditor.saveNow();
+    ['editor', 'edSettings', 'edFx', 'community'].forEach((id) => { if ($(id)) show(id, false); });
+    game.groundOverride = null;
+    game.custom = null;
     game.scene = 'menu';
     game.paused = false;
     A.resumeAll();
@@ -608,7 +625,7 @@
       Object.assign(mp, {
         inRoom: true, host: true, code, me: N.id, results: [], remote: {}, racing: false,
         players: [{ id: N.id, name: save.name, color: save.color }],
-        level: game.level ? game.levelIndex : (focusLevel || 0),
+        level: game.level && game.levelIndex >= 0 ? game.levelIndex : (focusLevel || 0),
       });
       tokiRoom(code);
       mpStatus('');
@@ -1013,6 +1030,8 @@
       ? { h0: held, last: held, steps: 0, t: [] } : null;
     game.deathTimer = 0;
     game.lastAutoCp = game.state.time;
+    game.trail = [];
+    game.wasGround = true;
     // Im Übungsmodus läuft die Musik beim Sterben einfach weiter; beim Countdown startet sie erst bei "LOS"
     if (game.countdown <= 0 && (!game.practice || !A.isPlaying())) A.playMusic(game.level.def.music, game.level.def.difficulty);
   }
@@ -1052,7 +1071,10 @@
     if (!game.practice) A.stopMusic(false);
     game.deathTimer = 1.0;
     game.shake = 0.35;
-    burst(s.x + 0.5, s.y + 0.5, PLAYER_COLORS[save.color], 36, 9);
+    burst(s.x + s.size / 2, s.y + s.size / 2, PLAYER_COLORS[save.color], 20, 9);
+    shatter(s.x, s.y, s.size, PLAYER_COLORS[save.color]);
+    game.flash = Math.max(game.flash, 0.3);
+    game.trail.length = 0;
     const pct = progress();
     const sv = levelSave(game.level.def.id);
     if (game.practice) sv.practice = Math.max(sv.practice, pct);
@@ -1069,6 +1091,7 @@
     game.winShown = false;
     game.winTimer = 1.3;
     game.flash = 1;
+    confetti();
     const sv = levelSave(game.level.def.id);
     if (game.practice) sv.practice = 100;
     else {
@@ -1115,13 +1138,16 @@
       if (ev === 'jump') game.jumps++;
       else if (ev === 'die') onDeath();
       else if (ev === 'win') { onWin(); if (game.race) mpFinished(); }
-      else if (ev === 'orb' || ev === 'pad') { game.jumps++; A.sfx(ev); ring(s.x + 0.5, s.y + 0.5, ev === 'pad' ? '#ffd84a' : '#ffffff'); }
-      else if (ev === 'portal') { A.sfx('portal'); game.flash = 0.35; }
-      else if (ev === 'coin') { A.sfx('coin'); burst(s.x + 0.5, s.y + 0.5, ['#ffd84a', '#fff3b0'], 16, 5); }
+      else if (ev === 'orb' || ev === 'pad') { game.jumps++; A.sfx(ev); shock(s.x + s.size / 2, s.y + s.size / 2, ev === 'pad' ? '#ffd84a' : '#ffffff', 10); }
+      else if (ev === 'portal') { A.sfx('portal'); game.flash = 0.35; shock(s.x + s.size / 2, s.y + s.size / 2, fxColors().accent, 14); }
+      else if (ev === 'coin') { A.sfx('coin'); burst(s.x + 0.5, s.y + 0.5, ['#ffd84a', '#fff3b0'], 16, 5); shock(s.x + 0.5, s.y + 0.5, '#ffd84a', 8); }
     }
     s.events.length = 0;
     if (s.dead || s.won) return;
     if (fx.next < fx.list.length) fxUpdate(s.x);
+    // Staub beim Landen
+    if (s.mode === 'cube' && s.onGround && !game.wasGround) dust(s.x, s.gs === 1 ? s.y : s.y + s.size, s.gs);
+    game.wasGround = s.onGround;
 
     // Drehung des Würfels
     if (s.mode === 'cube') {
@@ -1211,6 +1237,7 @@
   // Partikel
   // ---------------------------------------------------------------------
   function burst(x, y, colors, n, speed) {
+    if (save.fxReduced) n = Math.ceil(n / 2);
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
       const v = speed * (0.3 + Math.random());
@@ -1220,15 +1247,63 @@
     particles.push({ ring: true, x, y, life: 0.5, max: 0.5, color: colors[0] });
   }
   function ring(x, y, color) { particles.push({ ring: true, x, y, life: 0.35, max: 0.35, color }); }
+  /** Schockwelle + Funken (Ringe, Sprungfelder, Portale). */
+  function shock(x, y, color, n) {
+    particles.push({ ring: true, x, y, life: 0.45, max: 0.45, color, big: true });
+    if (!save.fxReduced) particles.push({ ring: true, x, y, life: 0.3, max: 0.3, color: '#ffffff' });
+    const k = save.fxReduced ? Math.ceil(n / 2) : n;
+    for (let i = 0; i < k; i++) {
+      const a = Math.random() * Math.PI * 2, v = 3 + Math.random() * 5;
+      particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.35 + Math.random() * 0.25, max: 0.6,
+        size: 0.07 + Math.random() * 0.07, color: i % 2 ? color : '#ffffff', square: false, glow: true });
+    }
+  }
+  /** Staub beim Landen. */
+  function dust(x, y, gs) {
+    const k = save.fxReduced ? 3 : 7;
+    for (let i = 0; i < k; i++) {
+      const dir = i % 2 ? 1 : -1;
+      particles.push({ x: x + 0.5 + dir * 0.3, y, vx: dir * (1.5 + Math.random() * 2.5), vy: gs * (0.5 + Math.random() * 1.5),
+        life: 0.3 + Math.random() * 0.2, max: 0.5, size: 0.08 + Math.random() * 0.08, color: 'rgba(255,255,255,0.8)', square: true });
+    }
+  }
+  /** Würfel zerspringt in 3×3 Stücke. */
+  function shatter(x, y, size, cols) {
+    const n = 3, piece = size / n;
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        const px = x + (i + 0.5) * piece, py = y + (j + 0.5) * piece;
+        const dx = px - (x + size / 2), dy = py - (y + size / 2);
+        particles.push({ x: px, y: py, vx: dx * 14 + (Math.random() - 0.5) * 3, vy: dy * 14 + 3 + Math.random() * 3,
+          life: 0.9 + Math.random() * 0.4, max: 1.3, size: piece * 0.9, color: (i + j) % 2 ? cols[0] : cols[1], square: true,
+          rot: 0, spin: (Math.random() - 0.5) * 16, heavy: true });
+      }
+    }
+  }
+  /** Konfetti von oben über den ganzen Bildschirm. */
+  function confetti() {
+    const cols = ['#ffe066', '#5ee6ff', '#ff5ec8', '#7dff9a', '#b980ff', '#ff9b3b'];
+    const n = save.fxReduced ? 30 : 90;
+    for (let i = 0; i < n; i++) {
+      particles.push({ conf: true, x: camX + Math.random() * viewW / TS, y: C.ROOF + 1 + Math.random() * 4,
+        vx: (Math.random() - 0.5) * 2, vy: -1 - Math.random() * 2.5, life: 2.2 + Math.random() * 1.2, max: 3.4,
+        w: 0.18 + Math.random() * 0.12, h: 0.1 + Math.random() * 0.06, rot: Math.random() * 6, spin: (Math.random() - 0.5) * 12,
+        ph: Math.random() * 6, color: cols[i % cols.length] });
+    }
+  }
 
   function updateParticles(dt) {
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.life -= dt;
       if (p.life <= 0) { particles.splice(i, 1); continue; }
-      if (!p.ring) {
+      if (p.conf) {
+        p.x += (p.vx + Math.sin(time * 4 + p.ph) * 0.8) * dt; p.y += p.vy * dt;
+        p.rot += p.spin * dt;
+      } else if (!p.ring) {
         p.x += p.vx * dt; p.y += p.vy * dt;
-        p.vx *= 1 - dt * 1.5; p.vy -= 6 * dt;
+        p.vx *= 1 - dt * 1.5; p.vy -= (p.heavy ? 22 : 6) * dt;
+        if (p.spin) p.rot = (p.rot || 0) + p.spin * dt;
       }
     }
   }
@@ -1256,23 +1331,37 @@
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, viewW, viewH);
 
+    // ferne Ebene: funkelnde Sterne (bewegen sich kaum)
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    for (const st of bgStars) {
+      const x = ((st.x - camX * TS * 0.03) % 2400 + 2400) % 2400 - 100;
+      if (x < -10 || x > viewW + 10) continue;
+      ctx.globalAlpha = 0.15 + 0.25 * (0.5 + 0.5 * Math.sin(time * 2 + st.ph)) + pulse * 0.1;
+      ctx.beginPath(); ctx.arc(x, st.y + viewH / 2 - 270, st.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+    // nahe Ebene: Quadrate, die im Takt etwas grösser werden
     ctx.save();
     ctx.globalAlpha = 0.08 + pulse * 0.05;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
+    const grow = 1 + Math.min(pulse, 2) * 0.06;
     for (const b of bgShapes) {
       const span = 2400;
       let x = ((b.x - camX * TS * b.d) % span + span) % span - 200;
       ctx.save();
       ctx.translate(x, b.y + viewH / 2 - 270);
       ctx.rotate(b.r + time * 0.05);
-      ctx.strokeRect(-b.s / 2, -b.s / 2, b.s, b.s);
+      const sz = b.s * grow;
+      ctx.strokeRect(-sz / 2, -sz / 2, sz, sz);
       ctx.restore();
     }
     ctx.restore();
   }
 
-  function drawGround(colors) {
+  function drawGround(colors, pulse) {
+    const glow = 14 + Math.min(pulse || 0, 2) * 12;
     ctx.fillStyle = colors.ground;
     ctx.fillRect(0, groundY, viewW, viewH - groundY);
     const g = ctx.createLinearGradient(0, groundY, 0, groundY + 80);
@@ -1287,7 +1376,7 @@
       ctx.beginPath(); ctx.moveTo(x, groundY); ctx.lineTo(x, viewH); ctx.stroke();
     }
     ctx.fillStyle = colors.accent;
-    ctx.shadowColor = colors.accent; ctx.shadowBlur = 14;
+    ctx.shadowColor = colors.accent; ctx.shadowBlur = glow;
     ctx.fillRect(0, groundY - 1, viewW, 3);
     ctx.shadowBlur = 0;
 
@@ -1432,6 +1521,26 @@
     ctx.strokeStyle = '#b88a00'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(0, 0, TS * 0.22, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
+    // Glitzern: zwei kleine Sterne, die abwechselnd aufleuchten
+    for (let i = 0; i < 2; i++) {
+      const ph = (time * 1.3 + i * 0.5 + o.x * 0.37) % 1;
+      if (ph > 0.4) continue;
+      const k = Math.sin(ph / 0.4 * Math.PI);
+      const a = o.x * 1.7 + i * 2.6;
+      drawSparkle(cx + Math.cos(a) * TS * 0.42, cy + Math.sin(a) * TS * 0.42, TS * 0.16 * k, k);
+    }
+  }
+
+  function drawSparkle(x, y, r, alpha) {
+    if (r < 0.5) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.25, y - r * 0.25); ctx.lineTo(x + r, y); ctx.lineTo(x + r * 0.25, y + r * 0.25);
+    ctx.lineTo(x, y + r); ctx.lineTo(x - r * 0.25, y + r * 0.25); ctx.lineTo(x - r, y); ctx.lineTo(x - r * 0.25, y - r * 0.25);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
   }
 
   function drawEnd(colors) {
@@ -1462,6 +1571,23 @@
     ctx.fillRect(-size * 0.2 - e / 2, -size * 0.12, e, e * 1.6);
     ctx.fillRect(size * 0.2 - e / 2, -size * 0.12, e, e * 1.6);
     ctx.fillRect(-size * 0.16, size * 0.14, size * 0.32, e * 0.7);
+  }
+
+  /** Leuchtende Spur aus den letzten Positionen. */
+  function drawTrail() {
+    const t = game.trail, s = game.state;
+    if (!t || t.length < 2 || s.dead) return;
+    const cols = PLAYER_COLORS[save.color];
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = cols[0];
+    for (let i = 1; i < t.length; i++) {
+      const k = i / t.length;
+      ctx.globalAlpha = 0.35 * k;
+      ctx.lineWidth = TS * s.size * 0.5 * k;
+      ctx.beginPath(); ctx.moveTo(wx(t[i - 1].x), wy(t[i - 1].y)); ctx.lineTo(wx(t[i].x), wy(t[i].y)); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function drawPlayer() {
@@ -1507,15 +1633,32 @@
       ctx.globalAlpha = a;
       if (p.ring) {
         ctx.strokeStyle = p.color;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = p.big ? 5 * a + 1 : 3;
         ctx.beginPath();
-        ctx.arc(wx(p.x), wy(p.y), TS * (0.4 + (1 - a) * 1.8), 0, Math.PI * 2);
+        ctx.arc(wx(p.x), wy(p.y), TS * (0.4 + (1 - a) * (p.big ? 2.6 : 1.8)), 0, Math.PI * 2);
         ctx.stroke();
+      } else if (p.conf) {
+        ctx.save();
+        ctx.translate(wx(p.x), wy(p.y)); ctx.rotate(p.rot); ctx.scale(1, Math.abs(Math.cos(p.rot * 0.7)) + 0.2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.min(1, a * 2);
+        ctx.fillRect(-p.w * TS / 2, -p.h * TS / 2, p.w * TS, p.h * TS);
+        ctx.restore();
       } else {
         ctx.fillStyle = p.color;
         const sz = p.size * TS;
-        if (p.square) ctx.fillRect(wx(p.x) - sz / 2, wy(p.y) - sz / 2, sz, sz);
-        else { ctx.beginPath(); ctx.arc(wx(p.x), wy(p.y), sz, 0, Math.PI * 2); ctx.fill(); }
+        if (p.rot) {
+          ctx.save();
+          ctx.translate(wx(p.x), wy(p.y)); ctx.rotate(p.rot);
+          ctx.fillRect(-sz / 2, -sz / 2, sz, sz);
+          ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.strokeRect(-sz / 2, -sz / 2, sz, sz);
+          ctx.restore();
+        } else if (p.square) ctx.fillRect(wx(p.x) - sz / 2, wy(p.y) - sz / 2, sz, sz);
+        else {
+          if (p.glow) { ctx.shadowColor = p.color; ctx.shadowBlur = 8; }
+          ctx.beginPath(); ctx.arc(wx(p.x), wy(p.y), sz, 0, Math.PI * 2); ctx.fill();
+          ctx.shadowBlur = 0;
+        }
       }
     }
     ctx.globalAlpha = 1;
@@ -1663,7 +1806,7 @@
 
     ctx.save();
     if (game.shake > 0) {
-      const m = game.shake * 14 * fx.shakePower;
+      const m = game.shake * 14 * fx.shakePower * (save.fxReduced ? 0.3 : 1);
       ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m);
     } else fx.shakePower = 1;
     const pulsing = time < fx.pulseUntil ? fx.pulsePower : 0;
@@ -1675,18 +1818,19 @@
       ctx.translate(zx, zy); ctx.scale(zoom, zoom); ctx.translate(-zx, -zy);
     }
     drawAttemptText();
-    drawGround(playColors);
+    drawGround(playColors, save.fxReduced ? 0 : pulse * pulse * (1 + pulsing));
 
     drawObjects(game.level, playColors, pulsing ? Math.min(1, pulse * (1 + pulsing * 0.5)) : pulse);
     drawEnd(playColors);
     drawCheckpoints();
     drawParticles();
     drawGhosts();
+    drawTrail();
     drawPlayer();
     ctx.restore();
 
     if (game.flash > 0) {
-      ctx.fillStyle = 'rgba(' + fx.flashRgb + ',' + (game.flash * 0.5) + ')';
+      ctx.fillStyle = 'rgba(' + fx.flashRgb + ',' + (game.flash * (save.fxReduced ? 0.2 : 0.5)) + ')';
       ctx.fillRect(0, 0, viewW, viewH);
     }
     drawHud();
@@ -1734,7 +1878,14 @@
         } else show('win', true);
       }
     }
-    if (!game.paused) updateParticles(dt);
+    if (game.scene === 'play' && !game.paused && game.state && !game.state.dead) {
+      const s = game.state;
+      game.trail.push({ x: s.x + s.size / 2, y: s.y + s.size / 2 });
+      if (game.trail.length > 14) game.trail.shift();
+    }
+    // kurze Zeitlupe direkt nach dem Ziel
+    const slow = game.scene === 'win' && game.winTimer > 0.7 && !save.fxReduced ? 0.35 : 1;
+    if (!game.paused) updateParticles(dt * slow);
     game.goFlash = Math.max(0, (game.goFlash || 0) - dt);
     if (game.race) mpSendState(now);
     game.shake = Math.max(0, game.shake - dt);

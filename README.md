@@ -25,6 +25,11 @@ Rakete durch Tunnel und drehst die Schwerkraft um.
 - Level-Editor: eigene Level bauen, testen und – wenn man sie geschafft hat – online
   veröffentlichen; Online-Level anderer Spieler entdecken, spielen, liken und melden
 - 6 Farben für den Würfel
+- Grafik-Effekte: Sterne und Formen im Hintergrund (Parallax, pulsieren im Takt), leuchtende
+  Spur, Staub beim Landen, Schockwellen an Ringen/Sprungfeldern/Portalen, glitzernde Münzen,
+  Würfel zerspringt beim Tod, Konfetti und kurze Zeitlupe im Ziel. Im Menü umschaltbar auf
+  **Effekte: reduziert** (weniger Teilchen, Blitze und Wackeln – für ältere Handys und
+  lichtempfindliche Spieler)
 - Läuft auf PC (Tastatur/Maus) und Handy/Tablet (Touch, Querformat)
 - Fortschritt wird lokal im Browser gespeichert (`localStorage`)
 - Keine Abhängigkeiten, kein Build-Schritt – reines HTML/CSS/JavaScript
