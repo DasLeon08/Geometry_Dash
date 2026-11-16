@@ -1494,6 +1494,18 @@
     const cx = wx(o.x + 0.5), cy = wy(o.y + 0.5);
     const st = PORTAL_STYLE[o.type];
     ctx.save();
+    if (E.MODE_PORTALS[o.type]) {
+      // Spielmodus-Portal wirkt über die ganze Höhe: feiner Lichtvorhang zeigt das
+      const top = wy(C.ROOF), bot = wy(0), w = TS * 0.34;
+      const g = ctx.createLinearGradient(cx - w, 0, cx + w, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.5, st[0]);
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.globalAlpha = 0.16 + 0.06 * Math.sin(time * 4 + o.x);
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - w, top, w * 2, bot - top);
+      ctx.globalAlpha = 1;
+    }
     ctx.shadowColor = st[0]; ctx.shadowBlur = 24;
     ctx.strokeStyle = st[0];
     ctx.lineWidth = 6;

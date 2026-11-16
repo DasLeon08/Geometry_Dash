@@ -64,6 +64,19 @@ ok(back.s.size === 1, 'Normal-Portal macht wieder gross');
 const roof = run(rowsWith(40, [['U', 3, 1], ['K', 12, 8]]), 25);
 ok(roof.s.size === 0.5 && Math.abs(roof.s.y + roof.s.size - E.C.ROOF) < 1e-9 && !roof.s.dead, 'Mini an der Decke liegt oben an');
 
+// Fehler aus dem Video: Rakete fliegt an der Decke bzw. am Boden am Würfel-Portal vorbei
+{
+  const items = [['S', 2, 1]];
+  for (let x = 4; x < 32; x++) for (let y = 4; y < 10; y++) items.push(['#', x, y]);    // tiefe Decke wie am Ende von ship()
+  items.push(['C', 26, 1]);
+  const ceil = run(rowsWith(40, items), 35, () => true);           // immer halten: klebt an der Decke
+  ok(!ceil.s.dead && ceil.s.mode === 'cube', 'Rakete an der Decke wird am Ende zum Würfel');
+  const floor = run(rowsWith(40, items), 35, () => false);         // nie halten: rutscht am Boden
+  ok(!floor.s.dead && floor.s.mode === 'cube', 'Rakete am Boden wird am Ende zum Würfel');
+  const high = run(rowsWith(40, [['S', 2, 1], ['C', 26, 1]]), 35, () => true);
+  ok(high.s.mode === 'cube', 'Würfel-Portal wirkt auch hoch oben (ganze Spalte)');
+}
+
 // Nachspielen mit neuen Objekten
 const lv = { map: [rowsWith(60, [['3', 4, 1], ['p', 14, 0], ['c', 25, 2], ['K', 30, 1], ['c', 40, 1], ['N', 45, 1], ['c', 50, 2]])] };
 const rr = E.runReplay(lv, { h0: false, t: [] });

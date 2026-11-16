@@ -56,7 +56,11 @@
   const HAZARDS = { spike: 1, spikeDown: 1, mini: 1 };
   const PORTALS = { ship: 1, cube: 1, gravUp: 1, gravDown: 1, speed1: 1, speed2: 1, speed3: 1, speed4: 1, miniPortal: 1, bigPortal: 1 };
 
+  // Spielmodus-Portale wirken über die ganze Höhe: man kann sie nicht umfliegen
+  const MODE_PORTALS = { ship: 1, cube: 1 };
+
   function hitbox(type, x, y) {
+    if (MODE_PORTALS[type]) return [x + 0.1, 0, x + 0.9, C.ROOF];
     switch (type) {
       case 'block': return [x, y, x + 1, y + 1];
       case 'spike': return [x + 0.3, y, x + 0.7, y + 0.55];
@@ -377,7 +381,7 @@
     return out.sort((a, b) => a.x - b.x || a.y - b.y);
   }
 
-  const Engine = { C, parseLevel, createState, cloneState, step, runReplay, CHAR_TYPES, SPEEDS, FX, fxDefaults, cleanExtras, MAX_EXTRAS };
+  const Engine = { C, MODE_PORTALS, parseLevel, createState, cloneState, step, runReplay, CHAR_TYPES, SPEEDS, FX, fxDefaults, cleanExtras, MAX_EXTRAS };
   if (typeof module !== 'undefined' && module.exports) module.exports = Engine;
   else root.Engine = Engine;
 })(this);
