@@ -154,7 +154,7 @@ ok(Object.keys(E.MODE_PORTALS).every((t) => {
 {
   const tap = (s) => (s.x > 6.0 && s.x < 6.05) || (s.x > 9.4 && s.x < 9.45);
   const g = run(rowsWith(40, [['g', 10, 2]]), 25, tap);
-  ok(g.s.gs === -1 && g.s.y + 1 === E.C.ROOF, 'grüner Ring dreht die Schwerkraft (landet an der Decke)');
+  ok(g.s.gs === -1 && g.s.y + 1 === E.C.ROOF, 'grüner Ring: Absprung und Schwerkraft dreht (landet an der Decke)');
   // schwarzer Ring: nach einem Sprung schneller wieder am Boden
   const land = (items) => { const lvl = E.parseLevel({ map: [rowsWith(40, items)] }); const st = E.createState(); let n = 0, jumped = false;
     while (st.x < 25) { const h = (st.x > 8 && st.x < 8.05) || (st.x > 9.4 && st.x < 9.45); E.step(st, lvl, h, E.C.DT); if (st.y > 0.5) jumped = true; if (jumped && st.y === 0) break; n++; } return st.x; };

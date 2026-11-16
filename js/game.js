@@ -288,6 +288,10 @@
     const first = Math.round(wrap.scrollLeft / cardStep());
     const a = Math.min(n, first + 1), b = Math.min(n, first + visibleCards());
     $('pgLabel').innerHTML = '<b>' + a + '–' + b + '</b>von ' + n;
+    const mid = Math.min(n - 1, first + Math.floor(visibleCards() / 2));
+    const w = (window.LEVELS[mid] && window.LEVELS[mid].world) || 1;
+    $('world1').classList.toggle('on', w === 1); $('world2').classList.toggle('on', w === 2);
+    $('world1').setAttribute('aria-selected', String(w === 1)); $('world2').setAttribute('aria-selected', String(w === 2));
     $('pgPrev').disabled = wrap.scrollLeft <= 2;
     $('pgNext').disabled = wrap.scrollLeft >= wrap.scrollWidth - wrap.clientWidth - 2;
   }
@@ -308,6 +312,16 @@
     wrap.scrollLeft = Math.max(0, i - 1) * cardStep();   // Level an zweiter Stelle zeigen
     updatePager();
   }
+  function goWorld(w) {
+    const i = window.LEVELS.findIndex((d) => (d.world || 1) === w);
+    if (i < 0) return;
+    A.sfx('click');
+    const wrap = $('levels');
+    wrap.scrollTo({ left: i * cardStep(), behavior: 'smooth' });
+    lastTarget = { i, t: performance.now() };
+  }
+  $('world1').onclick = () => goWorld(1);
+  $('world2').onclick = () => goWorld(2);
   $('pgPrev').onclick = () => { A.sfx('click'); scrollCards(-1, true); };
   $('pgNext').onclick = () => { A.sfx('click'); scrollCards(1, true); };
 
@@ -1055,7 +1069,7 @@
 
   /**
    * Punkte für die Toki-Bestenliste: Summe der Bestwerte (normaler Modus)
-   * über alle Level, also 0–100 pro Level und 1500 für alle 15 geschafft.
+   * über alle Level, also 0–100 pro Level und 3000 für alle 30 geschafft.
    * Der Wert kann nur steigen, egal welches Level gerade gespielt wird.
    */
   function totalScore() {

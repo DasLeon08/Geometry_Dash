@@ -348,6 +348,95 @@
     c.put('^', 7, 0).put('^', 18, 0).put('^', 28, 0).put('^', 29, 0);
     return [a.rows(), b.rows(), c.rows()];
   }
+  // ====================================================================
+  // Bausteine für Welt 2 (neue Modi). Auch sie beginnen und enden am Boden
+  // im Würfel-Modus mit normaler Schwerkraft.
+  // ====================================================================
+  /**
+   * Flieger-Tunnel für Rakete (S), Ufo (F), Welle (W) oder Schaukel (X).
+   * Am Ende wird der Gang 3 Kacheln niedrig; dort stehen Schwerkraft-, Tempo-
+   * und Würfel-Portal, die den ganzen Gang abdecken (man landet sicher am Boden).
+   */
+  function flyer(ch, o) {
+    const s = seg(o.w);
+    s.put(ch, 4, 1);
+    if (o.speed) s.put(o.speed, 6, 1);
+    (o.floor || []).forEach((f) => s.floor(f[0], f[1], f[2]));
+    (o.ceil || []).forEach((c) => s.ceil(c[0], c[1], c[2]));
+    (o.blocks || []).forEach((b) => s.fill('#', b[0], b[1], b[2], b[3]));
+    (o.spikes || []).forEach((p) => s.put(p[0], p[1], p[2]));
+    s.ceil(o.w - 12, 12, 7);
+    s.put('D', o.w - 10, 1);
+    if (o.speed) s.put('2', o.w - 8, 1);
+    s.put('C', o.w - 6, 1);
+    return finish(s, o);
+  }
+  /**
+   * Kugel (B) oder Spinne (P): rollt/läuft am Boden oder an der Decke.
+   * low = Stachelreihen am Boden [x, n], high = an der Decke [x, n].
+   * Die letzten 14 Kacheln hängen Stacheln an der Decke: man muss unten ankommen.
+   */
+  function roller(ch, o) {
+    const w = o.w, s = seg(w);
+    s.put(ch, 4, 1);
+    if (o.speed) s.put(o.speed, 6, 1);
+    (o.low || []).forEach((r) => s.fill('^', r[0], 0, r[1], 1));
+    (o.high || []).forEach((r) => s.fill('v', r[0], 9, r[1], 1));
+    (o.blocks || []).forEach((b) => s.fill('#', b[0], b[1], b[2], b[3]));
+    (o.spikes || []).forEach((p) => s.put(p[0], p[1], p[2]));
+    s.fill('v', w - 14, 9, 14, 1);
+    if (o.speed) s.put('2', w - 8, 1);
+    s.put('C', w - 6, 1);
+    return finish(s, o);
+  }
+  /** Roboter-Strecke: walls = [x, Breite, Höhe], low = Stachelreihen [x, n]. */
+  function robot(o) {
+    const s = seg(o.w);
+    s.put('R', 4, 1);
+    if (o.speed) s.put(o.speed, 6, 1);
+    (o.walls || []).forEach((b) => s.floor(b[0], b[1], b[2]));
+    (o.low || []).forEach((r) => s.fill('^', r[0], 0, r[1], 1));
+    (o.spikes || []).forEach((p) => s.put(p[0], p[1], p[2]));
+    if (o.speed) s.put('2', o.w - 8, 1);
+    s.put('C', o.w - 6, 1);
+    return finish(s, o);
+  }
+  /** Teleport über ein Stachelfeld: hinauf auf eine Plattform und am Ende wieder runter. */
+  function tele(o = {}) {
+    const len = o.len || 16, s = seg(len + 18);
+    s.put('T', 6, 1).put('t', 8, 6);
+    s.fill('#', 7, 4, len, 1);
+    s.fill('^', 9, 0, len, 1);
+    s.put('T', 6 + len, 6).put('t', 8 + len, 1);
+    (o.top || []).forEach((x) => s.put('^', x, 5));
+    if (o.coin) s.put('c', 7 + Math.round(len / 2), 7);
+    return finish(s, o);
+  }
+  /** Grüne Ringe: an die Decke und wieder runter über ein langes Stachelfeld. */
+  function greens(o = {}) {
+    const s = seg(46);
+    s.fill('^', 8, 0, 17, 1).put('g', 9, 2);
+    s.fill('v', 23, 9, 14, 1).put('g', 21, 8);
+    (o.v || []).forEach((x) => s.put('v', x, 9));
+    if (o.coin) s.put('c', 16, 9);
+    return finish(s, o);
+  }
+  /** Sägeblätter am Boden und in der Luft. saws = [x, y]. */
+  function saws(o) {
+    const s = seg(o.w);
+    (o.saws || []).forEach((p) => s.put('z', p[0], p[1]));
+    (o.walls || []).forEach((b) => s.floor(b[0], b[1], b[2]));
+    (o.spikes || []).forEach((p) => s.put(p[0], p[1], p[2]));
+    return finish(s, o);
+  }
+
+  /** Ein einzelnes Portal am Boden (z.B. 'N' = wieder gross, '2' = normales Tempo). */
+  function gate(ch) {
+    const s = seg(10);
+    s.put(ch, 4, 1);
+    return s.rows();
+  }
+
   /** Abschnitte zusammenfügen (Bausteine dürfen mehrere Abschnitte liefern). */
   function segs() {
     const out = [];
@@ -659,16 +748,382 @@
     },
   ];
 
+  // ====================================================================
+  // Welt 2: neue Fähigkeiten
+  // ====================================================================
+  const WORLD2 = [
+    {
+      id: 'kugelblitz', name: 'Kugelblitz', difficulty: 1,
+      colors: { bgTop: '#2a0a3a', bgBottom: '#d0406a', accent: '#ffd0a0', ground: '#3a0a30' },
+      music: { bpm: 126, root: 46, scale: [0, 2, 4, 7, 9], prog: [0, 3, 5, 4], lead: [0, 4, 2, 4, 5, 4, 2, 0] },
+      map: segs(
+        START,
+        fx('flash', { color: 1, dur: 0.4 }), fx('pulse', { power: 2, dur: 5 }, 0, 4),
+        run('^...........^^.............^......'),
+        pillars([1, 2, 1], { gap: 5 }),
+        fx('color', { theme: 1, fade: 0.8 }, 4, 8), fx('zoom', { zoom: 1.1, dur: 1 }, 4, 7),
+        roller('B', { w: 80, low: [[16, 8], [44, 10]], high: [[30, 8]], put: [['c', 38, 5]] }),
+        fx('color', { theme: 15, fade: 0.8 }, 0, 8), fx('zoom', { zoom: 1, dur: 0.8 }, 0, 7),
+        run('.....^^.........^........'),
+        orbOver(3, { coin: true, put: [['c', 9, 4]] }),
+        roller('B', { w: 70, low: [[14, 6], [36, 8]], high: [[24, 8]] }),
+        fx('pulse', { power: 3, dur: 5 }),
+        stairs([1, 2, 3], { spikes: 2, put: [['c', 17, 5]] }),
+        END
+      ),
+    },
+    {
+      id: 'schwebeflug', name: 'Schwebeflug', difficulty: 1,
+      colors: { bgTop: '#0a2a3a', bgBottom: '#2ab0a0', accent: '#fff4a0', ground: '#08323a' },
+      music: { bpm: 122, root: 45, scale: [0, 2, 4, 5, 7, 9, 11], prog: [0, 4, 5, 3], lead: [0, 2, 4, 2, 6, 4, 2, 1] },
+      map: segs(
+        START,
+        fx('flash', { color: 2, dur: 0.4 }), fx('pulse', { power: 2, dur: 5 }, 0, 4),
+        run('^............^^............'),
+        fx('color', { theme: 3, fade: 1 }, 4, 8), fx('pulse', { power: 3, dur: 6 }, 4, 6),
+        flyer('F', { w: 84, floor: [[16, 3, 2], [36, 3, 3], [56, 3, 2]], ceil: [[26, 3, 4], [46, 3, 4]], put: [['c', 41, 6]] }),
+        fx('color', { theme: 16, fade: 1 }, 0, 8),
+        run('.....^.........^^......'),
+        padTower({ coin: true }),
+        flyer('F', { w: 72, floor: [[14, 2, 3], [30, 2, 4]], ceil: [[22, 2, 4], [38, 2, 3]], spikes: [['^', 46, 0], ['^', 47, 0], ['^', 48, 0]], put: [['c', 26, 2]] }),
+        fx('pulse', { power: 3, dur: 5 }),
+        stairs([1, 2, 3], { spikes: 2 }),
+        END
+      ),
+    },
+    {
+      id: 'zickzack', name: 'Zickzack', difficulty: 1,
+      colors: { bgTop: '#0a0a3a', bgBottom: '#3a6ad0', accent: '#7dffea', ground: '#0a1440' },
+      music: { bpm: 130, root: 43, scale: [0, 3, 5, 7, 10], prog: [0, 2, 3, 4], lead: [0, 2, 4, 2, 3, 4, 1, 3] },
+      map: segs(
+        START,
+        fx('flash', { color: 2, dur: 0.4 }), fx('pulse', { power: 2, dur: 5 }, 0, 4),
+        run('^^...........^............^^.......'),
+        fx('color', { theme: 8, fade: 0.6 }, 4, 8), fx('zoom', { zoom: 1.12, dur: 1 }, 4, 7),
+        flyer('W', { w: 80, floor: [[16, 4, 3], [40, 4, 4]], ceil: [[28, 4, 3], [52, 4, 4]], put: [['c', 34, 5]] }),
+        fx('color', { theme: 17, fade: 0.8 }, 0, 8), fx('zoom', { zoom: 1, dur: 0.8 }, 0, 7),
+        run('.....^^.........^.......'),
+        orbChain(2, { coin: true }),
+        flyer('W', { w: 76, floor: [[14, 3, 4], [26, 3, 2], [38, 3, 5]], ceil: [[20, 3, 3], [32, 3, 5], [44, 3, 3]], put: [['c', 29, 4]] }),
+        fx('pulse', { power: 3, dur: 5 }),
+        pillars([1, 2, 3, 2]),
+        END
+      ),
+    },
+    {
+      id: 'blechpark', name: 'Blechpark', difficulty: 2,
+      colors: { bgTop: '#1a1a22', bgBottom: '#6a6a80', accent: '#ffb03b', ground: '#202028' },
+      music: { bpm: 134, root: 41, scale: [0, 2, 3, 5, 7, 9, 10], prog: [0, 3, 4, 0], lead: [0, 2, 3, 4, 2, 0, 4, 3] },
+      map: segs(
+        START,
+        fx('flash', { color: 1, dur: 0.4 }), fx('pulse', { power: 2, dur: 5 }, 0, 4),
+        run('^^..........^^^..........^.......'),
+        fx('color', { theme: 6, fade: 0.8 }, 4, 8), fx('shake', { power: 1, dur: 0.3 }, 4, 3),
+        robot({ w: 96, walls: [[14, 3, 1], [21, 3, 2], [28, 3, 3], [36, 3, 2], [43, 3, 1], [50, 3, 3], [58, 3, 2]],
+          low: [[17, 4], [24, 4], [31, 5], [39, 4], [46, 4], [53, 5], [61, 6]], put: [['c', 37, 5]] }),
+        fx('color', { theme: 18, fade: 0.8 }, 0, 8),
+        run('......^^........^^^.......'),
+        padTower({ h: 4, coin: true }),
+        robot({ w: 84, walls: [[14, 2, 2], [20, 2, 3], [26, 2, 1], [31, 2, 3], [37, 2, 2]],
+          low: [[16, 4], [22, 4], [28, 3], [33, 4], [39, 6]], put: [['c', 24, 6]] }),
+        fx('pulse', { power: 3, dur: 5 }),
+        stairs([2, 3, 2], { spikes: 3 }),
+        END
+      ),
+    },
+    {
+      id: 'spinnennetz', name: 'Spinnennetz', difficulty: 2,
+      colors: { bgTop: '#08040f', bgBottom: '#3a1a5a', accent: '#a0ff6a', ground: '#0e0618' },
+      music: { bpm: 138, root: 40, scale: [0, 1, 3, 5, 7, 8, 10], prog: [0, 5, 6, 4], lead: [0, 3, 1, 4, 3, 5, 4, 1] },
+      map: segs(
+        START,
+        fx('flash', { color: 4, dur: 0.4 }), fx('pulse', { power: 2, dur: 5 }, 0, 4),
+        run('^^^..........^^...........^^.......'),
+        fx('color', { theme: 12, fade: 0.6 }, 4, 8),
+        roller('P', { w: 96, low: [[14, 10], [44, 12], [72, 8]], high: [[28, 10], [60, 8]], put: [['c', 50, 9]] }),
+        fx('color', { theme: 19, fade: 0.8 }, 0, 8),
+        run('.....^^^........^......'),
+        orbChain(3, { coin: true }),
+        fx('zoom', { zoom: 1.12, dur: 0.8 }, 4, 7),
+        roller('P', { w: 90, low: [[12, 38]], high: [[52, 12]], blocks: [[16, 6, 14, 1], [36, 4, 10, 1]], put: [['c', 41, 5]] }),
+        fx('zoom', { zoom: 1, dur: 0.8 }, 0, 7),
+        fx('pulse', { power: 3, dur: 5 }),
+        pillars([2, 3, 2, 1], { gap: 4 }),
+        END
+      ),
+    },
+    {
+      id: 'pendel', name: 'Pendel', difficulty: 2,
+      colors: { bgTop: '#2a1400', bgBottom: '#d08a20', accent: '#fff0c0', ground: '#3a1c00' },
+      music: { bpm: 136, root: 44, scale: [0, 2, 4, 7, 9], prog: [0, 5, 3, 4], lead: [4, 2, 0, 2, 5, 4, 2, 0] },
+      map: segs(
+        START,
+        fx('flash', { color: 1, dur: 0.4 }), fx('pulse', { power: 2, dur: 5 }, 0, 4),
+        run('^..........^^^............^.......'),
+        fx('color', { theme: 7, fade: 1 }, 4, 8), fx('tilt', { angle: 6, dur: 1.2 }, 4, 6),
+        flyer('X', { w: 96, floor: [[16, 3, 4], [36, 3, 3], [56, 3, 5]], ceil: [[26, 3, 4], [46, 3, 5], [66, 3, 3]], put: [['c', 51, 2]] }),
+        fx('tilt', { angle: 0, dur: 0.8 }, 0, 6), fx('color', { theme: 20, fade: 1 }, 0, 8),
+        run('......^^.........^^^......'),
+        orbOver(4, { put: [['c', 10, 4]] }),
+        fx('tilt', { angle: -6, dur: 1.2 }, 4, 6),
+        flyer('X', { w: 90, floor: [[14, 2, 5], [30, 2, 4], [46, 2, 5]], ceil: [[22, 2, 4], [38, 2, 5], [54, 2, 4]], put: [['c', 34, 7]] }),
+        fx('tilt', { angle: 0, dur: 0.8 }, 0, 6),
+        fx('pulse', { power: 3, dur: 5 }),
+        stairs([1, 2, 3], { spikes: 3 }),
+        END
+      ),
+    },
+    {
+      id: 'portalsprung', name: 'Portalsprung', difficulty: 2,
+      colors: { bgTop: '#001a2a', bgBottom: '#0a6aa0', accent: '#ff9b3b', ground: '#00202e' },
+      music: { bpm: 140, root: 42, scale: [0, 2, 3, 7, 9], prog: [0, 3, 1, 4], lead: [0, 4, 2, 3, 4, 1, 2, 0] },
+      map: segs(
+        START,
+        fx('flash', { color: 2, dur: 0.4 }), fx('pulse', { power: 2, dur: 5 }, 0, 4),
+        run('^^...........^^............^.......'),
+        tele({ len: 16, top: [14], coin: true }),
+        fx('shake', { power: 1, dur: 0.3 }, 0, 3),
+        run('.....^^^........^^.......'),
+        fx('color', { theme: 9, fade: 0.6 }, 6, 8),
+        greens({ v: [], coin: true }),
+        fx('color', { theme: 21, fade: 0.8 }, 0, 8),
+        (function () {
+          // blaues Sprungfeld: an die Decke, dort über hängende Stacheln, Schwerkraft-Portal zurück
+          const t = seg(48);
+          t.put('u', 8, 0).fill('^', 10, 0, 22, 1);
+          t.put('v', 18, 9).put('v', 25, 9).put('v', 26, 9);
+          t.put('D', 28, 8);
+          t.put('c', 24, 6);
+          return t.rows();
+        })(),
+        run('.....^^........'),
+        (function () {
+          // schwarzer Ring: nach dem Sprungfeld schnell runter unter den hängenden Block
+          const t = seg(34);
+          t.put('_', 6, 0).fill('^', 8, 0, 6, 1).put('n', 11, 4);
+          t.fill('#', 14, 0, 10, 1).fill('#', 16, 3, 6, 7);
+          return t.rows();
+        })(),
+        tele({ len: 12, top: [] }),
+        fx('pulse', { power: 3, dur: 5 }),
+        orbChain(3),
+        END
+      ),
+    },
+    {
+      id: 'saegewerk', name: 'Sägewerk', difficulty: 3,
+      colors: { bgTop: '#1a0a00', bgBottom: '#7a3a10', accent: '#ffd84a', ground: '#241000' },
+      music: { bpm: 146, root: 39, scale: [0, 1, 4, 5, 7, 8, 10], prog: [0, 1, 4, 0], lead: [0, 1, 4, 2, 5, 4, 1, 0] },
+      map: segs(
+        START,
+        fx('flash', { color: 1, dur: 0.4 }), fx('shake', { power: 2, dur: 0.4 }, 0, 3), fx('pulse', { power: 2, dur: 6 }, 0, 4),
+        run('^^...........^^^..........'),
+        saws({ w: 52, saws: [[8, 0], [16, 0], [17, 0], [26, 0], [34, 0], [35, 0], [36, 0], [44, 3]], walls: [[30, 3, 1]], put: [['c', 31, 3]] }),
+        fx('color', { theme: 6, fade: 0.6 }, 4, 8),
+        robot({ w: 90, speed: '3', walls: [[14, 3, 2], [22, 3, 3], [31, 3, 1], [39, 3, 3], [48, 3, 2], [57, 3, 3]],
+          low: [[17, 5], [25, 6], [34, 5], [42, 6], [51, 6], [60, 8]], spikes: [['z', 23, 4], ['z', 40, 4]], put: [['c', 46, 6]] }),
+        fx('color', { theme: 22, fade: 0.8 }, 0, 8),
+        run('......^^.......^^^.......'),
+        fx('zoom', { zoom: 1.12, dur: 0.8 }, 4, 7), fx('pulse', { power: 3, dur: 6 }, 4, 6),
+        flyer('S', { w: 100, speed: '3', floor: [[16, 3, 4], [34, 3, 5], [52, 3, 3], [70, 3, 4]], ceil: [[25, 3, 4], [43, 3, 4], [61, 3, 5]],
+          spikes: [['z', 30, 5], ['z', 48, 4], ['z', 66, 5]], put: [['c', 57, 6]] }),
+        fx('zoom', { zoom: 1, dur: 0.8 }, 0, 7),
+        saws({ w: 40, saws: [[8, 0], [9, 0], [18, 0], [19, 0], [20, 0], [28, 0]] }),
+        END
+      ),
+    },
+    {
+      id: 'wellenbrecher', name: 'Wellenbrecher', difficulty: 3,
+      colors: { bgTop: '#00101f', bgBottom: '#0050a0', accent: '#5effe1', ground: '#001428' },
+      music: { bpm: 150, root: 41, scale: [0, 2, 3, 5, 7, 9, 10], prog: [0, 6, 5, 4], lead: [0, 2, 4, 6, 5, 4, 2, 1] },
+      map: segs(
+        START,
+        fx('flash', { color: 2, dur: 0.4 }), fx('pulse', { power: 2, dur: 6 }, 0, 4),
+        run('^^^..........^^...........^^^.......'),
+        fx('color', { theme: 5, fade: 0.6 }, 4, 8), fx('zoom', { zoom: 1.15, dur: 1 }, 4, 7),
+        flyer('W', { w: 100, floor: [[14, 3, 4], [24, 3, 2], [34, 3, 5], [44, 3, 3], [54, 3, 5], [64, 3, 2]],
+          ceil: [[19, 3, 3], [29, 3, 5], [39, 3, 3], [49, 3, 4], [59, 3, 3], [69, 3, 5]], put: [['c', 42, 5]] }),
+        fx('color', { theme: 23, fade: 0.8 }, 0, 8), fx('zoom', { zoom: 1, dur: 0.6 }, 0, 7),
+        run('.....^^^.........^^......'),
+        orbChain(4, { coin: true }),
+        fx('pulse', { power: 3, dur: 6 }, 4, 6), fx('shake', { power: 1, dur: 0.4 }, 4, 3),
+        flyer('S', { w: 92, speed: '3', floor: [[14, 2, 4], [28, 2, 5], [42, 2, 4], [56, 2, 5]], ceil: [[21, 2, 5], [35, 2, 4], [49, 2, 5], [63, 2, 4]] }),
+        fx('zoom', { zoom: 1.15, dur: 0.8 }, 4, 7),
+        flyer('W', { w: 96, speed: '3', floor: [[14, 4, 3], [28, 4, 4], [42, 4, 3], [56, 4, 4]], ceil: [[21, 4, 4], [35, 4, 3], [49, 4, 4], [63, 4, 3]], put: [['c', 39, 4]] }),
+        fx('zoom', { zoom: 1, dur: 0.6 }, 0, 7),
+        stairs([2, 3, 4], { spikes: 3 }),
+        END
+      ),
+    },
+    {
+      id: 'spiegelwelt', name: 'Spiegelwelt', difficulty: 3,
+      colors: { bgTop: '#14002a', bgBottom: '#7a3ad0', accent: '#ffffff', ground: '#1a0036' },
+      music: { bpm: 148, root: 43, scale: [0, 2, 4, 6, 7, 9, 11], prog: [0, 4, 5, 2], lead: [0, 4, 6, 4, 2, 4, 1, 0] },
+      map: segs(
+        START,
+        fx('flash', { color: 0, dur: 0.5 }), fx('pulse', { power: 2, dur: 5 }, 0, 4),
+        run('^^...........^^^.........^.^.......'),
+        fx('mirror', { on: 1, dur: 0.6 }, 2, 6), fx('color', { theme: 4, fade: 0.6 }, 2, 8),
+        roller('B', { w: 90, low: [[14, 8], [36, 10], [60, 8]], high: [[24, 10], [48, 10]], blocks: [[30, 4, 3, 2]], put: [['c', 43, 5]] }),
+        fx('mirror', { on: 0, dur: 0.6 }, 0, 6), fx('color', { theme: 24, fade: 0.6 }, 0, 8),
+        run('.....^^^........^^.......'),
+        padTower({ h: 4, coin: true }),
+        fx('mirror', { on: 1, dur: 0.6 }, 2, 6),
+        flyer('F', { w: 90, floor: [[14, 2, 3], [26, 2, 4], [38, 2, 3], [50, 2, 5]], ceil: [[20, 2, 5], [32, 2, 4], [44, 2, 5], [56, 2, 3]], put: [['c', 29, 2]] }),
+        fx('mirror', { on: 0, dur: 0.6 }, 0, 6),
+        fx('pulse', { power: 3, dur: 6 }),
+        roller('B', { w: 64, low: [[12, 6], [28, 6]], high: [[20, 6], [36, 6]] }),
+        pillars([2, 3, 2]),
+        END
+      ),
+    },
+    {
+      id: 'nebelnacht', name: 'Nebelnacht', difficulty: 3,
+      colors: { bgTop: '#020208', bgBottom: '#1a2a3a', accent: '#a0e0ff', ground: '#04060c' },
+      music: { bpm: 144, root: 38, scale: [0, 2, 3, 7, 8], prog: [0, 5, 3, 4], lead: [0, 3, 2, 4, 3, 1, 0, 2] },
+      map: segs(
+        START,
+        fx('dark', { power: 0.6, dur: 2 }, 0, 6), fx('pulse', { power: 1, dur: 6 }, 0, 4),
+        run('^^...........^^^...........^.......'),
+        stairs([1, 2, 3], { spikes: 3 }),
+        fx('dark', { power: 0.85, dur: 1 }, 2, 6),
+        roller('P', { w: 100, low: [[12, 12], [40, 12], [70, 10]], high: [[26, 10], [56, 10]], blocks: [[30, 5, 6, 1], [60, 4, 6, 1]], put: [['c', 32, 4], ['c', 62, 3]] }),
+        fx('flash', { color: 2, dur: 0.6 }, 0, 4), fx('dark', { power: 0.5, dur: 1 }, 0, 6),
+        run('.....^^^........^^.......'),
+        orbChain(4, { coin: true }),
+        fx('dark', { power: 0.9, dur: 0.8 }, 2, 6),
+        roller('P', { w: 80, low: [[12, 30]], high: [[44, 12]], blocks: [[18, 6, 8, 1], [30, 3, 8, 1]] }),
+        fx('dark', { power: 0, dur: 1.5 }, 0, 6), fx('flash', { color: 0, dur: 0.8 }, 0, 4), fx('pulse', { power: 3, dur: 6 }, 0, 5),
+        pillars([2, 3, 4, 3]),
+        END
+      ),
+    },
+    {
+      id: 'kaleidoskop', name: 'Kaleidoskop', difficulty: 3,
+      colors: { bgTop: '#1a0030', bgBottom: '#d04a8a', accent: '#7dffea', ground: '#22003a' },
+      music: { bpm: 152, root: 44, scale: [0, 2, 4, 7, 9], prog: [0, 3, 4, 5], lead: [0, 2, 4, 7, 4, 2, 5, 4] },
+      map: segs(
+        START,
+        fx('flash', { color: 3, dur: 0.4 }), fx('pulse', { power: 3, dur: 6 }, 0, 4),
+        run('^^^..........^^^..........'),
+        fx('tilt', { angle: 8, dur: 1 }, 2, 6), fx('color', { theme: 2, fade: 0.5 }, 2, 8),
+        roller('B', { w: 60, low: [[12, 8], [32, 8]], high: [[22, 8]] }),
+        fx('tilt', { angle: -8, dur: 1 }, 0, 6), fx('color', { theme: 7, fade: 0.5 }, 0, 8),
+        flyer('F', { w: 64, floor: [[14, 2, 3], [26, 2, 4]], ceil: [[20, 2, 4], [32, 2, 3]], put: [['c', 23, 6]] }),
+        fx('tilt', { angle: 6, dur: 1 }, 0, 6), fx('color', { theme: 8, fade: 0.5 }, 0, 8),
+        flyer('W', { w: 64, floor: [[14, 3, 3], [30, 3, 4]], ceil: [[22, 3, 4], [38, 3, 3]] }),
+        fx('tilt', { angle: 0, dur: 0.8 }, 0, 6), fx('color', { theme: 26, fade: 0.5 }, 0, 8),
+        greens({ coin: true }),
+        fx('tilt', { angle: -10, dur: 1.2 }, 0, 6), fx('zoom', { zoom: 1.12, dur: 1 }, 0, 7),
+        robot({ w: 70, walls: [[14, 3, 2], [21, 3, 3], [29, 3, 1], [36, 3, 3]], low: [[17, 4], [24, 5], [32, 4], [39, 6]], put: [['c', 22, 6]] }),
+        fx('tilt', { angle: 0, dur: 0.8 }, 0, 6), fx('zoom', { zoom: 1, dur: 0.8 }, 0, 7),
+        flyer('X', { w: 70, floor: [[14, 3, 4], [34, 3, 4]], ceil: [[24, 3, 4], [44, 3, 4]] }),
+        fx('pulse', { power: 3, dur: 6 }),
+        orbOver(4),
+        END
+      ),
+    },
+    {
+      id: 'ueberladung', name: 'Überladung', difficulty: 4,
+      colors: { bgTop: '#000a14', bgBottom: '#00506a', accent: '#ff5ec8', ground: '#000e1a' },
+      music: { bpm: 164, root: 40, scale: [0, 1, 3, 7, 8], prog: [0, 3, 4, 1], lead: [0, 3, 1, 4, 3, 0, 4, 2] },
+      map: segs(
+        START,
+        fx('flash', { color: 3, dur: 0.4 }), fx('shake', { power: 2, dur: 0.4 }, 0, 3), fx('pulse', { power: 3, dur: 6 }, 0, 4),
+        run('^^^.........^^^..........'),
+        gate('K'),
+        run('.....^.^......^^........^.^.^.......'),
+        fx('color', { theme: 13, fade: 0.5 }, 2, 8), fx('zoom', { zoom: 1.2, dur: 1 }, 2, 7),
+        flyer('S', { w: 90, floor: [[12, 2, 4], [22, 2, 5], [32, 2, 3], [42, 10, 3], [60, 2, 5]], ceil: [[17, 2, 4], [27, 2, 3], [37, 2, 5], [42, 10, 5], [66, 2, 5]],
+          spikes: [['^', 45, 3], ['v', 49, 4]], put: [['c', 56, 4]] }),
+        fx('color', { theme: 8, fade: 0.5 }, 0, 8),
+        flyer('W', { w: 84, floor: [[12, 3, 4], [20, 3, 5], [28, 3, 4], [36, 3, 5], [44, 3, 4]], ceil: [[16, 3, 4], [24, 3, 3], [32, 3, 4], [40, 3, 3], [48, 3, 4]], put: [['c', 30, 5]] }),
+        fx('color', { theme: 27, fade: 0.5 }, 0, 8),
+        flyer('F', { w: 76, floor: [[12, 2, 3], [22, 2, 4], [32, 2, 3]], ceil: [[17, 2, 5], [27, 2, 4], [37, 2, 5]], spikes: [['^', 44, 0], ['^', 45, 0], ['^', 46, 0], ['^', 47, 0]] }),
+        gate('N'),
+        fx('zoom', { zoom: 1, dur: 0.8 }), fx('flash', { color: 0, dur: 0.5 }, 0, 4),
+        flyer('X', { w: 90, speed: '3', floor: [[14, 3, 4], [30, 3, 5], [46, 3, 4]], ceil: [[22, 3, 4], [38, 3, 4], [54, 3, 4]], put: [['c', 41, 6]] }),
+        fx('pulse', { power: 3, dur: 6 }),
+        stairs([2, 3, 4], { spikes: 4 }),
+        END
+      ),
+    },
+    {
+      id: 'sturmkern', name: 'Sturmkern', difficulty: 4,
+      colors: { bgTop: '#0a0014', bgBottom: '#3a0a6a', accent: '#ffe14a', ground: '#0e001c' },
+      music: { bpm: 168, root: 42, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 6, 4], lead: [0, 2, 3, 5, 7, 5, 3, 2] },
+      map: segs(
+        START,
+        fx('flash', { color: 1, dur: 0.4 }), fx('shake', { power: 2, dur: 0.4 }, 0, 3), fx('pulse', { power: 3, dur: 8 }, 0, 4),
+        run('^^^..........^^^.........'),
+        fx('color', { theme: 1, fade: 0.3 }, 2, 8),
+        roller('B', { w: 50, speed: '3', low: [[12, 6]], high: [[20, 8]], put: [['c', 17, 5]] }),
+        fx('color', { theme: 3, fade: 0.3 }, 0, 8), fx('tilt', { angle: 5, dur: 0.6 }, 0, 6),
+        flyer('F', { w: 50, speed: '3', floor: [[14, 2, 3]], ceil: [[22, 2, 4]], spikes: [['^', 30, 0], ['^', 31, 0], ['^', 32, 0]] }),
+        fx('color', { theme: 17, fade: 0.3 }, 0, 8), fx('tilt', { angle: -5, dur: 0.6 }, 0, 6),
+        flyer('W', { w: 54, speed: '3', floor: [[14, 3, 4], [26, 3, 3]], ceil: [[20, 3, 3], [32, 3, 4]] }),
+        fx('color', { theme: 18, fade: 0.3 }, 0, 8), fx('tilt', { angle: 0, dur: 0.6 }, 0, 6),
+        robot({ w: 54, speed: '3', walls: [[14, 3, 2], [22, 3, 3], [31, 3, 2]], low: [[17, 5], [25, 6], [34, 6]], put: [['c', 24, 6]] }),
+        fx('color', { theme: 19, fade: 0.3 }, 0, 8), fx('dark', { power: 0.6, dur: 0.5 }, 0, 6),
+        roller('P', { w: 54, speed: '3', low: [[12, 10]], high: [[24, 8]], blocks: [[34, 5, 5, 1]] }),
+        fx('color', { theme: 20, fade: 0.3 }, 0, 8), fx('dark', { power: 0, dur: 0.5 }, 0, 6),
+        flyer('X', { w: 56, speed: '3', floor: [[14, 3, 4]], ceil: [[26, 3, 4]], put: [['c', 21, 3]] }),
+        fx('color', { theme: 28, fade: 0.3 }, 0, 8), fx('zoom', { zoom: 1.15, dur: 0.6 }, 0, 7),
+        flyer('S', { w: 70, speed: '4', floor: [[14, 2, 4], [30, 2, 5]], ceil: [[22, 2, 4], [38, 2, 4]] }),
+        fx('zoom', { zoom: 1, dur: 0.6 }, 0, 7), fx('shake', { power: 2, dur: 0.4 }, 0, 3),
+        orbChain(5),
+        END
+      ),
+    },
+    {
+      id: 'neon-finale', name: 'Neon-Finale', difficulty: 4,
+      colors: { bgTop: '#000000', bgBottom: '#26265a', accent: '#5ee6ff', ground: '#05051a' },
+      music: { bpm: 174, root: 45, scale: [0, 2, 3, 5, 7, 8, 11], prog: [0, 3, 4, 5], lead: [0, 4, 2, 6, 7, 4, 2, 5] },
+      map: segs(
+        START,
+        fx('flash', { color: 0, dur: 0.6 }), fx('shake', { power: 3, dur: 0.5 }, 0, 3), fx('pulse', { power: 3, dur: 8 }, 0, 4),
+        run('^^^..........^^^........m^m........'),
+        orbChain(5, { coin: true }),
+        fx('color', { theme: 14, fade: 0.6 }, 4, 8), fx('zoom', { zoom: 1.12, dur: 1 }, 4, 7),
+        flyer('S', { w: 96, floor: [[12, 2, 5], [22, 2, 6], [32, 2, 5], [44, 14, 3]], ceil: [[17, 2, 3], [27, 2, 3], [37, 2, 4], [44, 14, 4]],
+          spikes: [['^', 48, 3], ['v', 52, 5]], put: [['c', 64, 7]] }),
+        fx('zoom', { zoom: 1, dur: 0.6 }, 0, 7), fx('mirror', { on: 1, dur: 0.6 }, 0, 6), fx('color', { theme: 24, fade: 0.6 }, 0, 8),
+        roller('B', { w: 70, low: [[12, 8], [36, 8]], high: [[24, 8], [48, 6]] }),
+        fx('mirror', { on: 0, dur: 0.6 }, 0, 6), fx('color', { theme: 23, fade: 0.6 }, 0, 8),
+        flyer('W', { w: 80, speed: '3', floor: [[14, 3, 4], [24, 3, 3], [34, 3, 5], [44, 3, 4]], ceil: [[19, 3, 4], [29, 3, 5], [39, 3, 3], [49, 3, 4]], put: [['c', 31, 3]] }),
+        fx('tilt', { angle: 8, dur: 0.8 }, 0, 6), fx('color', { theme: 18, fade: 0.6 }, 0, 8),
+        robot({ w: 64, walls: [[14, 3, 2], [21, 3, 3], [29, 3, 2], [36, 3, 3]], low: [[17, 4], [24, 5], [32, 4], [39, 6]], spikes: [['z', 22, 5]] }),
+        fx('tilt', { angle: 0, dur: 0.6 }, 0, 6), fx('dark', { power: 0.8, dur: 0.6 }, 0, 6), fx('color', { theme: 25, fade: 0.6 }, 0, 8),
+        roller('P', { w: 80, low: [[12, 12], [40, 12]], high: [[26, 10], [56, 10]], blocks: [[30, 5, 6, 1]] }),
+        fx('dark', { power: 0, dur: 0.8 }, 0, 6), fx('flash', { color: 2, dur: 0.5 }, 0, 4),
+        greens({}),
+        fx('color', { theme: 20, fade: 0.6 }, 0, 8), fx('tilt', { angle: -8, dur: 0.8 }, 0, 6),
+        flyer('X', { w: 80, speed: '3', floor: [[14, 3, 4], [30, 3, 5], [46, 3, 4]], ceil: [[22, 3, 4], [38, 3, 4]] }),
+        fx('tilt', { angle: 0, dur: 0.6 }, 0, 6), fx('color', { theme: 29, fade: 0.6 }, 0, 8),
+        flyer('F', { w: 64, floor: [[14, 2, 3], [26, 2, 4]], ceil: [[20, 2, 4], [32, 2, 3]] }),
+        fx('pulse', { power: 3, dur: 8 }), fx('shake', { power: 2, dur: 0.5 }, 0, 3),
+        stairs([2, 3, 4, 3, 4], { spikes: 5 }),
+        END
+      ),
+    },
+  ];
+
   // Reihenfolge = steigende Schwierigkeit
   const ORDER = [
     'erster-sprung', 'sonnenpfad', 'kristallhoehle', 'erster-flug',
     'neon-himmel', 'tiefsee', 'vulkan', 'polarlicht', 'turbo-tunnel',
     'umkehr', 'schattenwerk', 'sternenstaub', 'glitch',
     'nachtschicht', 'neon-kern',
+    // Welt 2
+    'kugelblitz', 'schwebeflug', 'zickzack',
+    'blechpark', 'spinnennetz', 'pendel', 'portalsprung',
+    'saegewerk', 'wellenbrecher', 'spiegelwelt', 'nebelnacht', 'kaleidoskop',
+    'ueberladung', 'sturmkern', 'neon-finale',
   ];
-  const ALL = LEVELS.concat(MORE);
+  const ALL = LEVELS.concat(MORE, WORLD2);
   const SORTED = ORDER.map((id) => ALL.find((l) => l.id === id));
   SORTED.forEach((def, i) => {
+    def.world = i < 15 ? 1 : 2;
     takeFx(def);
     if (!def.extras) def.extras = autoFx(def, i, (i + 5) % 15);
   });

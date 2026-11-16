@@ -413,9 +413,9 @@
             if (t === 'orb' || t === 'orbPink') {
               s.vy = s.gs * C.ORB_V * (air ? 0.6 : 1) * (t === 'orbPink' ? C.PINK : 1);
             } else if (t === 'orbGreen') {
-              // Schwerkraft drehen und in die neue Richtung abspringen
-              s.gs = -s.gs;
+              // abspringen wie beim gelben Ring, dann dreht die Schwerkraft: schnell zur anderen Seite
               s.vy = s.gs * C.ORB_V * (air ? 0.6 : 1);
+              s.gs = -s.gs;
             } else if (t === 'orbBlack') {
               // kräftig nach unten (Richtung Schwerkraft)
               s.vy = -s.gs * C.BLACK_ORB_V;

@@ -69,6 +69,7 @@ function verify(def) {
     furthest,
     length: level.length,
     coins: best ? best.coins.size : 0,
+    missing: best ? level.objects.filter((o) => o.type === 'coin' && !best.coins.has(o.id)).map((o) => '(' + o.x + ',' + o.y + ')') : [],
     coinCount: level.coinCount,
     seconds: level.length / E.C.SPEED,
   };
@@ -105,7 +106,7 @@ LEVELS.forEach((def, i) => {
     console.log('OK    ' + name + '  (' + r.length + ' Kacheln, ' + r.seconds.toFixed(1) + ' s, Münzen ' +
       r.coins + '/' + r.coinCount + ', ' + ms + ' ms)');
     if (r.coins < r.coinCount) {
-      console.log('      Warnung: nicht alle Münzen erreichbar');
+      console.log('      Warnung: nicht alle Münzen erreichbar, es fehlen ' + r.missing.join(' '));
       failed++;
     }
   } else {
