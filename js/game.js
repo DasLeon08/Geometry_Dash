@@ -20,12 +20,32 @@
   const PLAYER_COLORS = [
     ['#5ee6ff', '#ffef5e'], ['#7dff9a', '#2a7cff'], ['#ff5ec8', '#ffffff'],
     ['#ffb03b', '#ff3b6b'], ['#c58cff', '#5effd8'], ['#ffffff', '#ff5e5e'],
+    // freischaltbar
+    ['#ffe14a', '#7a3cff'], ['#2fffd0', '#ff4fd8'], ['#ff4f4f', '#ffe14a'],
+    ['#4a7cff', '#7dffea'], ['#2a2a3a', '#5ee6ff'], ['#a0ff3b', '#ff9b3b'],
   ];
+  const FACE_COUNT = 16;
+  /**
+   * Bedingungen zum Freischalten (null = von Anfang an frei).
+   * coins: Münzen in den eingebauten Leveln, levels: geschaffte Level,
+   * world1/world2: geschaffte Level der Welt, extreme: geschaffte Extrem-Level.
+   */
+  const UNLOCKS = {
+    face: [null, null, { coins: 3 }, { levels: 3 }, { coins: 10 }, { levels: 6 }, { coins: 20 }, { world2: 1 },
+      { levels: 10 }, { coins: 30 }, { world1: 15 }, { coins: 45 }, { world2: 5 }, { coins: 60 }, { extreme: 6 }, { levels: 30 }],
+    color: [null, null, null, null, null, null, { coins: 5 }, { levels: 4 }, { coins: 15 }, { levels: 8 }, { coins: 40 }, { levels: 20 }],
+  };
 
   // ---------------------------------------------------------------------
   // Speicherstand (nur im Browser des Spielers)
   // ---------------------------------------------------------------------
   const save = loadSave();
+  // gewähltes Design muss freigeschaltet sein; bekannte Freischaltungen merken (ohne Meldung beim ersten Mal)
+  (function fixDesign() {
+    if (!unlocked('face', save.icon)) save.icon = 0;
+    if (!unlocked('color', save.color)) save.color = 0;
+    if (!save.seen) save.seen = unlockedKeys();
+  })();
   // Ganzzahl zwischen 0 und max, alles andere wird 0.
   function clampInt(v, max) {
     v = Number(v);
@@ -43,6 +63,8 @@
     data.name = typeof raw.name === 'string' ? raw.name.replace(/[\u0000-\u001f<>]/g, '').slice(0, 16) : '';
     data.nameTyped = raw.nameTyped === true;
     data.fxReduced = raw.fxReduced === true;
+    data.icon = clampInt(raw.icon, FACE_COUNT - 1);
+    data.seen = Array.isArray(raw.seen) ? raw.seen.filter((k) => typeof k === 'string' && /^(face|color)\d{1,2}$/.test(k)).slice(0, 40) : null;
     const levels = raw.levels && typeof raw.levels === 'object' ? raw.levels : {};
     // eingebaute Level plus höchstens 200 Online-Level ("online:<id>")
     const ids = window.LEVELS.map((def) => def.id)
@@ -61,6 +83,55 @@
     });
     return data;
   }
+  // ----- Designs freischalten ---------------------------------------------
+  function designStats() {
+    const st = { coins: 0, levels: 0, world1: 0, world2: 0, extreme: 0 };
+    window.LEVELS.forEach((def) => {
+      const sv = save.levels[def.id];
+      if (!sv) return;
+      st.coins += sv.coins.length;
+      if (!sv.done) return;
+      st.levels++;
+      if (def.world === 2) st.world2++; else st.world1++;
+      if (def.difficulty === 4) st.extreme++;
+    });
+    return st;
+  }
+  function unlocked(kind, i, st) {
+    const req = UNLOCKS[kind][i];
+    if (!req) return true;
+    st = st || designStats();
+    return Object.keys(req).every((k) => st[k] >= req[k]);
+  }
+  function unlockText(kind, i) {
+    const req = UNLOCKS[kind][i];
+    if (!req) return 'Frei';
+    const k = Object.keys(req)[0], n = req[k];
+    if (k === 'coins') return n + ' Münzen sammeln';
+    if (k === 'levels') return n === window.LEVELS.length ? 'Alle ' + n + ' Level schaffen' : n + ' Level schaffen';
+    if (k === 'world1') return 'Welt 1 komplett schaffen';
+    if (k === 'world2') return n === 1 ? 'Ein Level aus Welt 2 schaffen' : n + ' Level aus Welt 2 schaffen';
+    return 'Alle Extrem-Level schaffen';
+  }
+  function unlockedKeys() {
+    const st = designStats(), out = [];
+    for (let i = 0; i < FACE_COUNT; i++) if (unlocked('face', i, st)) out.push('face' + i);
+    for (let i = 0; i < PLAYER_COLORS.length; i++) if (unlocked('color', i, st)) out.push('color' + i);
+    return out;
+  }
+  /** Nach einem geschafften Level: neue Designs melden. */
+  function checkUnlocks() {
+    const now = unlockedKeys();
+    const fresh = now.filter((k) => save.seen.indexOf(k) === -1);
+    save.seen = now;
+    writeSave();
+    if (fresh.length) {
+      setTimeout(() => toast(fresh.length === 1 ? 'Neues Design freigeschaltet! Schau unter „Designs“.' : fresh.length + ' neue Designs freigeschaltet! Schau unter „Designs“.'), 1400);
+      newDesigns = true;
+    }
+  }
+  let newDesigns = false;
+
   function writeSave() {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* privat / blockiert */ }
   }
@@ -259,11 +330,8 @@
       }
     });
     // Spielfigur
-    const cols2 = PLAYER_COLORS[save.color];
     const px = ts * 2, py = gy - ts;
-    c.fillStyle = cols2[0]; c.fillRect(px, py, ts, ts);
-    c.fillStyle = cols2[1]; c.fillRect(px + ts * 0.22, py + ts * 0.22, ts * 0.56, ts * 0.56);
-    c.strokeStyle = '#000'; c.lineWidth = 1.5; c.strokeRect(px, py, ts, ts);
+    c.save(); c.translate(px + ts / 2, py + ts / 2); cubeOn(c, ts, PLAYER_COLORS[save.color], save.icon); c.restore();
     // Abdunkeln nach unten, damit Text lesbar bleibt
     const shade = c.createLinearGradient(0, h * 0.4, 0, h);
     shade.addColorStop(0, 'rgba(14,18,48,0)');
@@ -424,19 +492,63 @@
       arts.forEach((a) => drawCardArt(a[0], a[1], a[2]));
     });
 
-    const sw = $('swatches');
-    sw.querySelectorAll('button').forEach((b) => b.remove());
-    PLAYER_COLORS.forEach((c, i) => {
-      const b = document.createElement('button');
-      b.className = 'swatch' + (save.color === i ? ' active' : '');
-      b.style.background = c[0];
-      b.style.boxShadow = 'inset 0 0 0 7px ' + c[0] + ', inset 0 0 0 16px ' + c[1];
-      b.setAttribute('aria-label', 'Farbe ' + (i + 1));
-      b.onclick = () => { save.color = i; writeSave(); A.sfx('click'); buildMenu(); };
-      sw.appendChild(b);
-    });
+    drawDesignPreview($('designPrev'), 40);
+    $('designNew').classList.toggle('hidden', !newDesigns);
     updateSoundBtn();
   }
+
+  // ----- Fenster "Designs" ------------------------------------------------
+  function drawDesignPreview(cv, px, face, color) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = px * dpr; cv.height = px * dpr;
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, px * dpr / 2, px * dpr / 2);
+    c.clearRect(-px, -px, px * 2, px * 2);
+    const f = face === undefined ? save.icon : face, col = color === undefined ? save.color : color;
+    // Ohren und Krone ragen nach oben: diese Gesichter etwas kleiner und tiefer zeichnen
+    const tall = f === 13 || f === 15;
+    if (tall) c.translate(0, px * 0.08);
+    cubeOn(c, px * (tall ? 0.66 : 0.8), PLAYER_COLORS[col], f);
+  }
+  function renderDesigns() {
+    const st = designStats();
+    drawDesignPreview($('dsPreview'), 96);
+    $('dsStats').textContent = 'Münzen: ' + st.coins + ' / ' + window.LEVELS.length * 3 + ' · Geschafft: ' + st.levels + ' / ' + window.LEVELS.length;
+    const faces = $('dsFaces'), colors = $('dsColors');
+    faces.textContent = ''; colors.textContent = '';
+    for (let i = 0; i < FACE_COUNT; i++) {
+      const ok = unlocked('face', i, st);
+      const b = document.createElement('button');
+      b.className = 'ds-item' + (save.icon === i ? ' on' : '') + (ok ? '' : ' locked');
+      b.title = ok ? 'Gesicht ' + (i + 1) : 'Gesperrt: ' + unlockText('face', i);
+      b.setAttribute('aria-label', b.title);
+      const cv = document.createElement('canvas');
+      b.appendChild(cv);
+      drawDesignPreview(cv, 44, i, ok ? save.color : 5);
+      if (!ok) { const l = document.createElement('span'); l.className = 'ds-lock'; l.textContent = unlockText('face', i); b.appendChild(l); }
+      b.onclick = () => {
+        if (!ok) { toast('Gesperrt: ' + unlockText('face', i)); return; }
+        save.icon = i; writeSave(); A.sfx('click'); renderDesigns();
+      };
+      faces.appendChild(b);
+    }
+    PLAYER_COLORS.forEach((cl, i) => {
+      const ok = unlocked('color', i, st);
+      const b = document.createElement('button');
+      b.className = 'swatch' + (save.color === i ? ' active' : '') + (ok ? '' : ' locked');
+      b.style.background = cl[0];
+      b.style.boxShadow = 'inset 0 0 0 7px ' + cl[0] + ', inset 0 0 0 16px ' + cl[1];
+      b.title = ok ? 'Farbe ' + (i + 1) : 'Gesperrt: ' + unlockText('color', i);
+      b.setAttribute('aria-label', b.title);
+      b.onclick = () => {
+        if (!ok) { toast('Gesperrt: ' + unlockText('color', i)); return; }
+        save.color = i; writeSave(); A.sfx('click'); renderDesigns();
+      };
+      colors.appendChild(b);
+    });
+  }
+  $('designBtn').onclick = () => { A.sfx('click'); newDesigns = false; renderDesigns(); show('designs', true); };
+  $('dsDone').onclick = () => { A.sfx('click'); show('designs', false); buildMenu(); };
 
   function updateFxBtn() {
     $('fxBtn').lastChild.textContent = save.fxReduced ? 'Effekte: reduziert' : 'Effekte: voll';
@@ -638,7 +750,7 @@
       const code = await N.host();
       Object.assign(mp, {
         inRoom: true, host: true, code, me: N.id, results: [], remote: {}, racing: false,
-        players: [{ id: N.id, name: save.name, color: save.color }],
+        players: [{ id: N.id, name: save.name, color: save.color, icon: save.icon }],
         level: game.level && game.levelIndex >= 0 ? game.levelIndex : (focusLevel || 0),
       });
       tokiRoom(code);
@@ -661,7 +773,7 @@
     try {
       await N.join(code);
       Object.assign(mp, { inRoom: true, host: false, code, me: N.id, players: [], results: [], remote: {}, racing: false });
-      N.send({ t: 'hello', name: save.name, color: save.color });
+      N.send({ t: 'hello', name: save.name, color: save.color, icon: save.icon });
       tokiRoom(code);
       mpStatus('');
       renderLobby();
@@ -735,7 +847,7 @@
     if (m.t === 'hello') {
       if (mp.players.some((p) => p.id === from)) return;
       if (mp.players.length >= MAX_PLAYERS) { N.sendTo(from, { t: 'full' }); N.kick(from); return; }
-      const p = { id: from, name: cleanName(m.name), color: clampInt(m.color, PLAYER_COLORS.length - 1) };
+      const p = { id: from, name: cleanName(m.name), color: clampInt(m.color, PLAYER_COLORS.length - 1), icon: clampInt(m.icon, FACE_COUNT - 1) };
       mp.players.push(p);
       toast(p.name + ' ist beigetreten!');
       A.sfx('coin');
@@ -763,7 +875,7 @@
       if (!Array.isArray(m.players)) return;
       mp.players = m.players.slice(0, MAX_PLAYERS)
         .filter((p) => p && typeof p.id === 'string')
-        .map((p) => ({ id: p.id.slice(0, 80), name: cleanName(p.name), color: clampInt(p.color, PLAYER_COLORS.length - 1) }));
+        .map((p) => ({ id: p.id.slice(0, 80), name: cleanName(p.name), color: clampInt(p.color, PLAYER_COLORS.length - 1), icon: clampInt(p.icon, FACE_COUNT - 1) }));
       mp.level = clampInt(m.level, window.LEVELS.length - 1);
       mp.mode = m.mode === 'end' ? 'end' : 'go';
       renderLobby();
@@ -935,7 +1047,7 @@
       const cols = PLAYER_COLORS[p.color];
       ctx.save();
       ctx.globalAlpha = 0.5;
-      drawAvatar(r.sx, r.sy, r.r, E.MODES[r.m] || 'cube', r.g, cols, false, r.z);
+      drawAvatar(r.sx, r.sy, r.r, E.MODES[r.m] || 'cube', r.g, cols, false, r.z, p.icon);
       ctx.restore();
       ctx.save();
       ctx.globalAlpha = 0.95;
@@ -1119,7 +1231,7 @@
       });
     }
     writeSave();
-    if (!game.practice) reportScore();
+    if (!game.practice) { reportScore(); if (game.levelIndex >= 0) checkUnlocks(); }
     for (let i = 0; i < 6; i++) {
       setTimeout(() => burst(s.x - 2 + Math.random() * 4, 3 + Math.random() * 5,
         ['#ffd84a', '#5ee6ff', '#ff5ec8'], 24, 7), i * 160);
@@ -1652,22 +1764,106 @@
     ctx.fillRect(x - 3, 0, 4, groundY);
   }
 
-  function drawCubeShape(size, cols) {
-    const h = size / 2;
-    ctx.fillStyle = cols[0];
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.rect(-h, -h, size, size); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = cols[1];
-    const i = size * 0.2;
-    ctx.fillRect(-h + i, -h + i, size - 2 * i, size - 2 * i);
-    ctx.strokeRect(-h + i, -h + i, size - 2 * i, size - 2 * i);
-    // Gesicht
-    ctx.fillStyle = '#000';
+  let avatarFace = 0;   // Gesicht des Würfels, der gerade gezeichnet wird
+  function drawCubeShape(size, cols, face) {
+    cubeOn(ctx, size, cols, face === undefined ? avatarFace : face);
+  }
+  /** Würfel mit einem der 16 Gesichter auf einen Canvas zeichnen (Mitte = 0,0). */
+  function cubeOn(c, size, cols, face) {
+    const h = size / 2, lw = Math.max(1.5, size / 14);
+    c.fillStyle = cols[0];
+    c.strokeStyle = '#000';
+    c.lineWidth = lw;
+    c.lineJoin = 'round';
+    c.beginPath(); c.rect(-h, -h, size, size); c.fill(); c.stroke();
+    const i = size * 0.2, w = size - 2 * i;
+    c.fillStyle = cols[1];
+    c.fillRect(-h + i, -h + i, w, w);
+    c.strokeRect(-h + i, -h + i, w, w);
     const e = size * 0.12;
-    ctx.fillRect(-size * 0.2 - e / 2, -size * 0.12, e, e * 1.6);
-    ctx.fillRect(size * 0.2 - e / 2, -size * 0.12, e, e * 1.6);
-    ctx.fillRect(-size * 0.16, size * 0.14, size * 0.32, e * 0.7);
+    const eyes = (y, hh) => { c.fillRect(-size * 0.2 - e / 2, y, e, hh); c.fillRect(size * 0.2 - e / 2, y, e, hh); };
+    c.fillStyle = '#000';
+    switch (face) {
+      case 1:   // Zyklop
+        c.fillRect(-e, -size * 0.16, e * 2, e * 1.8);
+        c.fillStyle = cols[0]; c.fillRect(-e * 0.4, -size * 0.1, e * 0.8, e * 0.8); c.fillStyle = '#000';
+        c.fillRect(-size * 0.12, size * 0.14, size * 0.24, e * 0.6);
+        break;
+      case 2:   // Visier
+        c.fillRect(-size * 0.27, -size * 0.12, size * 0.54, e * 1.2);
+        c.fillStyle = cols[0]; c.fillRect(size * 0.08, -size * 0.1, e * 0.9, e * 0.6); c.fillStyle = '#000';
+        break;
+      case 3:   // fröhlich
+        eyes(-size * 0.14, e * 1.4);
+        c.lineWidth = lw * 1.3; c.beginPath(); c.arc(0, size * 0.02, size * 0.16, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
+        break;
+      case 4:   // müde
+        eyes(-size * 0.06, e * 0.5);
+        c.fillRect(-size * 0.08, size * 0.14, size * 0.16, e * 0.6);
+        break;
+      case 5:   // grimmig
+        eyes(-size * 0.08, e * 1.2);
+        c.lineWidth = lw * 1.2; c.beginPath();
+        c.moveTo(-size * 0.28, -size * 0.2); c.lineTo(-size * 0.1, -size * 0.12);
+        c.moveTo(size * 0.28, -size * 0.2); c.lineTo(size * 0.1, -size * 0.12); c.stroke();
+        c.fillRect(-size * 0.14, size * 0.16, size * 0.28, e * 0.6);
+        break;
+      case 6:   // Roboter
+        c.fillRect(-size * 0.25, -size * 0.16, e * 1.3, e * 1.3); c.fillRect(size * 0.25 - e * 1.3, -size * 0.16, e * 1.3, e * 1.3);
+        for (let k = 0; k < 4; k++) c.fillRect(-size * 0.18 + k * size * 0.11, size * 0.08, size * 0.05, size * 0.14);
+        break;
+      case 7:   // staunend
+        c.beginPath(); c.arc(-size * 0.17, -size * 0.08, e * 0.7, 0, Math.PI * 2); c.arc(size * 0.17, -size * 0.08, e * 0.7, 0, Math.PI * 2); c.fill();
+        c.lineWidth = lw; c.beginPath(); c.arc(0, size * 0.15, e * 0.7, 0, Math.PI * 2); c.stroke();
+        break;
+      case 8: { // Schachbrett
+        const q = w / 3;
+        c.fillStyle = cols[0];
+        for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) if ((a + b) % 2 === 0) c.fillRect(-h + i + a * q, -h + i + b * q, q, q);
+        c.strokeRect(-h + i, -h + i, w, w);
+        break;
+      }
+      case 9:   // Streifen
+        c.save(); c.beginPath(); c.rect(-h + i, -h + i, w, w); c.clip();
+        c.fillStyle = cols[0];
+        for (let k = -3; k <= 3; k++) { c.beginPath(); c.moveTo(k * size * 0.16 - size * 0.3, -size * 0.3); c.lineTo(k * size * 0.16 - size * 0.22, -size * 0.3); c.lineTo(k * size * 0.16 + size * 0.38, size * 0.3); c.lineTo(k * size * 0.16 + size * 0.3, size * 0.3); c.fill(); }
+        c.restore(); c.strokeRect(-h + i, -h + i, w, w);
+        break;
+      case 10:  // Raute
+        c.fillStyle = cols[0];
+        c.beginPath(); c.moveTo(0, -size * 0.26); c.lineTo(size * 0.26, 0); c.lineTo(0, size * 0.26); c.lineTo(-size * 0.26, 0); c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = '#000'; c.fillRect(-e / 2, -e / 2, e, e);
+        break;
+      case 11:  // Ring
+        c.lineWidth = lw * 1.6; c.beginPath(); c.arc(0, 0, size * 0.17, 0, Math.PI * 2); c.stroke();
+        break;
+      case 12:  // Stern
+        c.beginPath();
+        for (let k = 0; k < 8; k++) { const r = k % 2 ? size * 0.09 : size * 0.26, a = k * Math.PI / 4 - Math.PI / 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+        c.closePath(); c.fill();
+        break;
+      case 13:  // Katze
+        c.fillStyle = cols[0];
+        c.beginPath(); c.moveTo(-h, -h); c.lineTo(-h + size * 0.3, -h); c.lineTo(-h + size * 0.08, -h - size * 0.24); c.closePath(); c.fill(); c.stroke();
+        c.beginPath(); c.moveTo(h, -h); c.lineTo(h - size * 0.3, -h); c.lineTo(h - size * 0.08, -h - size * 0.24); c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = '#000'; eyes(-size * 0.12, e * 1.3);
+        c.lineWidth = lw * 0.8; c.beginPath();
+        c.moveTo(-size * 0.06, size * 0.12); c.lineTo(0, size * 0.17); c.lineTo(size * 0.06, size * 0.12); c.stroke();
+        break;
+      case 14:  // Plus
+        c.fillRect(-size * 0.06, -size * 0.24, size * 0.12, size * 0.48); c.fillRect(-size * 0.24, -size * 0.06, size * 0.48, size * 0.12);
+        break;
+      case 15:  // Krone
+        c.fillStyle = '#ffd84a';
+        c.beginPath(); c.moveTo(-h * 0.8, -h); c.lineTo(-h * 0.8, -h - size * 0.26); c.lineTo(-h * 0.4, -h - size * 0.1); c.lineTo(0, -h - size * 0.3);
+        c.lineTo(h * 0.4, -h - size * 0.1); c.lineTo(h * 0.8, -h - size * 0.26); c.lineTo(h * 0.8, -h); c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = '#000'; eyes(-size * 0.12, e * 1.6);
+        c.fillRect(-size * 0.16, size * 0.14, size * 0.32, e * 0.7);
+        break;
+      default:  // klassisch
+        eyes(-size * 0.12, e * 1.6);
+        c.fillRect(-size * 0.16, size * 0.14, size * 0.32, e * 0.7);
+    }
   }
 
   /** Leuchtende Spur aus den letzten Positionen. */
@@ -1702,7 +1898,7 @@
   function drawPlayer() {
     const s = game.state;
     if (s.dead) return;
-    drawAvatar(s.x, s.y, game.rot, s.mode, s.gs, PLAYER_COLORS[save.color], true, s.size);
+    drawAvatar(s.x, s.y, game.rot, s.mode, s.gs, PLAYER_COLORS[save.color], true, s.size, save.icon);
   }
 
   // Modi, in denen man läuft (Staub beim Landen, Checkpoints am Boden)
@@ -1780,8 +1976,9 @@
     },
   };
 
-  function drawAvatar(x, y, rot, mode, gs, cols, glow, size) {
+  function drawAvatar(x, y, rot, mode, gs, cols, glow, size, face) {
     const z = size || 1;
+    avatarFace = face || 0;
     const cx = wx(x + z / 2), cy = wy(y + z / 2);
     ctx.save();
     ctx.translate(cx, cy);

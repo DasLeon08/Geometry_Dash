@@ -342,6 +342,27 @@
     .swatch { width: 34px; height: 34px; border-radius: 10px; border: 3px solid var(--ink); transition: transform .1s; }
     .swatch:hover { transform: scale(1.08); }
     .swatch.active { transform: scale(1.12) rotate(-6deg); outline: 3px solid var(--sun); outline-offset: 1px; }
+    .design-btn {
+      display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 14px 0 6px; border-radius: 999px; position: relative;
+      font-size: 15px; font-weight: 700; color: var(--ink); background: #fff; border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink);
+    }
+    .design-btn canvas { width: 40px; height: 40px; }
+    .design-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+    .new-dot { position: absolute; top: -10px; right: -8px; padding: 2px 7px; border-radius: 999px; font-size: 11px; color: #fff; background: var(--rose); border: 2px solid var(--ink); }
+    #designs .panel { width: min(560px, 100%); max-height: 100%; overflow-y: auto; }
+    .ds-head { display: flex; align-items: center; gap: 14px; margin: 6px 0 8px; }
+    .ds-head canvas { width: 96px; height: 96px; flex: none; }
+    .ds-head p { margin: 0; font-size: 14px; font-weight: 600; color: var(--sub); }
+    .ds-label { font-size: 13px; font-weight: 700; color: var(--sub); margin: 10px 0 6px; }
+    .ds-faces { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+    .ds-item { position: relative; aspect-ratio: 1; border-radius: 12px; border: 3px solid var(--ink); background: #fff; display: grid; place-items: center; padding: 0; overflow: hidden; }
+    .ds-item canvas { width: 44px; height: 44px; max-width: 90%; }
+    .ds-item.on { background: var(--sun); transform: scale(1.06); }
+    .ds-item.locked canvas { opacity: 0.25; filter: grayscale(1); }
+    .ds-lock { position: absolute; inset: auto 2px 2px 2px; font-size: 8px; line-height: 1.05; font-weight: 700; color: var(--ink); text-align: center; }
+    .ds-colors { display: flex; flex-wrap: wrap; gap: 8px; }
+    .swatch.locked { opacity: 0.3; filter: grayscale(0.7); }
+    .ds-hint { font-size: 12px; color: var(--sub); margin: 12px 0; }
     .fx-toggle {
       display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 999px;
       font-size: 13px; font-weight: 700; color: var(--ink); background: #fff; border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink);
@@ -547,6 +568,11 @@
       h1.logo { font-size: 34px; -webkit-text-stroke-width: 2px; filter: drop-shadow(0 4px 0 var(--ink)); }
       .tagline, .controls { display: none; }
       .worlds { margin-top: 6px; }
+      .ds-faces { grid-template-columns: repeat(8, 1fr); gap: 4px; }
+      .ds-lock { display: none; }
+      .ds-head canvas { width: 64px; height: 64px; }
+      .design-btn { height: 38px; font-size: 13px; }
+      .design-btn canvas { width: 32px; height: 32px; }
       .worlds button { height: 28px; padding: 0 10px; font-size: 12px; }
       .worlds button span { display: none; }
       .page-label { min-width: 64px; font-size: 11px; }
@@ -656,7 +682,7 @@
       </div>
       <div id="levels" class="levels"></div>
       <div class="menu-bottom">
-        <div class="skin" id="swatches"><span>Würfel</span></div>
+        <button class="design-btn" id="designBtn"><canvas id="designPrev"></canvas><span>Designs</span><b class="new-dot hidden" id="designNew">Neu</b></button>
         <button class="fx-toggle" id="fxBtn"><svg class="i"><use href="#i-spark"/></svg><span>Effekte: voll</span></button>
         <div class="controls">
           <span><kbd>Leertaste</kbd> / Klick / Tippen: springen</span>
@@ -774,6 +800,20 @@
   </div>
 
   <!-- Mehrspieler -->
+  <div id="designs" class="overlay dim hidden">
+    <div class="panel">
+      <div class="eyebrow">Designs</div>
+      <div class="title">Dein Würfel</div>
+      <div class="ds-head"><canvas id="dsPreview"></canvas><p id="dsStats"></p></div>
+      <div class="ds-label">Gesicht</div>
+      <div class="ds-faces" id="dsFaces"></div>
+      <div class="ds-label">Farbe</div>
+      <div class="ds-colors" id="dsColors"></div>
+      <p class="ds-hint">Neue Designs schaltest du mit Münzen und geschafften Leveln frei. Das Gesicht siehst du in jedem Modus, auch im Mehrspieler.</p>
+      <button class="btn-go" id="dsDone"><svg class="i"><use href="#i-check"/></svg>Fertig</button>
+    </div>
+  </div>
+
   <div id="mp" class="overlay dim hidden">
     <div class="panel">
       <!-- Schritt 1: Raum erstellen oder beitreten -->

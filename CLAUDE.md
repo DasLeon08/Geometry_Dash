@@ -29,3 +29,9 @@
   Server `server/levels.js` + `server/store.js` (Postgres über `DATABASE_URL`, sonst Arbeitsspeicher).
   Veröffentlichen nur mit Replay, das `Engine.runReplay` ins Ziel bringt – darum muss `js/engine.js`
   deterministisch bleiben (kein `Math.random`, keine Trigonometrie, fester Zeitschritt).
+- Spielmodi (`E.MODES`): cube, ship, ball, ufo, wave, robot, spider, swing. Modus-Portale
+  (`E.MODE_PORTALS`) wirken über die ganze Höhe. Neue Level nur hinten an `ORDER` in
+  `js/levels.js` anhängen (Farb-Trigger und Entwürfe benutzen Level-Nummern; Server-Grenze
+  `THEMES` in `server/levels.js`). Effekte in eingebauten Leveln über `fx()`-Marken oder `autoFx`.
+- Designs: `FACE_COUNT`, `PLAYER_COLORS`, `UNLOCKS` in `js/game.js`; Gesicht wird über
+  `cubeOn()` gezeichnet und im Mehrspieler als `icon` mitgeschickt (geprüft).

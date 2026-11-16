@@ -8,13 +8,17 @@ Rakete durch Tunnel und drehst die Schwerkraft um.
 
 ## Features
 
-- 15 Level in vier Stufen:
-  - Leicht: *Erster Sprung*, *Sonnenpfad*, *Kristallhöhle*, *Erster Flug*
-  - Mittel: *Neon-Himmel*, *Tiefsee*, *Vulkan*, *Polarlicht*, *Turbo-Tunnel*
-  - Schwer: *Umkehr*, *Schattenwerk*, *Sternenstaub*, *Glitch*
-  - Extrem: *Nachtschicht*, *Neon-Kern*
-- Würfel- und Raketen-Modus, Sprungfelder, gelbe/blaue Ringe, Schwerkraft-Portale;
-  im Editor zusätzlich rosa Sprungfeld/Ring, Tempo-Portale (4 Stufen) und Mini-Portal
+- 30 Level in zwei Welten, jede von Leicht bis Extrem (Tabs „Welt 1 / Welt 2“ im Menü):
+  - Welt 1: *Erster Sprung*, *Sonnenpfad*, *Kristallhöhle*, *Erster Flug*, *Neon-Himmel*,
+    *Tiefsee*, *Vulkan*, *Polarlicht*, *Turbo-Tunnel*, *Umkehr*, *Schattenwerk*,
+    *Sternenstaub*, *Glitch*, *Nachtschicht*, *Neon-Kern*
+  - Welt 2 (neue Fähigkeiten): *Kugelblitz*, *Schwebeflug*, *Zickzack*, *Blechpark*,
+    *Spinnennetz*, *Pendel*, *Portalsprung*, *Sägewerk*, *Wellenbrecher*, *Spiegelwelt*,
+    *Nebelnacht*, *Kaleidoskop*, *Überladung*, *Sturmkern*, *Neon-Finale*
+- 8 Spielmodi: Würfel, Rakete, Kugel, Ufo, Welle, Roboter, Spinne, Schaukel
+  (Modus-Portale wirken über die ganze Höhe, man kann sie nicht umfliegen)
+- Sprungfelder (gelb, rosa, blau), Ringe (gelb, rosa, blau, grün, schwarz),
+  Schwerkraft-, Tempo- (4 Stufen), Mini- und Teleport-Portale, Sägeblätter
 - 3 Münzen pro Level, Bestwerte in % (Normal und Übung)
 - Übungsmodus mit automatischen und manuellen Checkpoints
 - Selbst erzeugte Musik und Sounds (Web Audio, keine Audiodateien): jeder Song mit
@@ -24,7 +28,10 @@ Rakete durch Tunnel und drehst die Schwerkraft um.
 - Mehrspieler-Rennen für bis zu 4 Spieler mit Raumcode (siehe unten)
 - Level-Editor: eigene Level bauen, testen und – wenn man sie geschafft hat – online
   veröffentlichen; Online-Level anderer Spieler entdecken, spielen, liken und melden
-- 6 Farben für den Würfel
+- Designs: 16 Würfel-Gesichter und 12 Farben; die meisten schaltet man mit Münzen und
+  geschafften Leveln frei (Knopf „Designs“ im Menü). Das Gesicht sieht man in jedem
+  Modus, auch bei den Mitspielern
+- Effekte in allen Leveln: Farbwechsel, Blitz, Wackeln, Puls, Zoom, Neigen, Spiegeln, Dunkel
 - Grafik-Effekte: Sterne und Formen im Hintergrund (Parallax, pulsieren im Takt), leuchtende
   Spur, Staub beim Landen, Schockwellen an Ringen/Sprungfeldern/Portalen, glitzernde Münzen,
   Würfel zerspringt beim Tod, Konfetti und kurze Zeitlupe im Ziel. Im Menü umschaltbar auf
@@ -39,12 +46,23 @@ Rakete durch Tunnel und drehst die Schwerkraft um.
 
 | Aktion | Taste |
 | --- | --- |
-| Springen / Rakete hoch | Leertaste, ↑, W, Klick oder Tippen |
+| Springen / Fähigkeit | Leertaste, ↑, W, Klick oder Tippen |
 | Pause | Esc oder P |
 | Neu starten | R |
 | Checkpoint setzen / löschen (Übung) | Z / X |
 
 Gedrückt halten = automatisch wieder springen, sobald der Würfel landet.
+
+| Modus | Steuerung |
+| --- | --- |
+| Würfel | tippen = springen |
+| Rakete | halten = steigen, loslassen = sinken |
+| Kugel | am Boden tippen = Schwerkraft umdrehen, rollt zur anderen Seite |
+| Ufo | jedes Tippen = kleiner Sprung, auch in der Luft |
+| Welle | halten = schräg hoch, loslassen = schräg runter |
+| Roboter | halten = springen, je länger, desto höher |
+| Spinne | tippen = sofort an die gegenüberliegende Fläche |
+| Schaukel | fliegt von selbst, tippen = Richtung wechseln |
 
 ## Lokal starten
 
@@ -175,7 +193,7 @@ Im Menü auf **Bauen** tippen. Unter **Meine Level** baut man bis zu 20 eigene L
 - Editor: Objekt wählen und tippen/klicken, ziehen malt. Rechtsklick oder Radierer löscht,
   „Hand“ oder Mausrad verschiebt, Strg+Z/Y, Tasten 1–9 wählen Objekte. Zahnrad: Name,
   Farben, Musik, Schwierigkeit.
-- **Effekte** (Farbe, Wackeln, Blitz, Puls, Zoom) setzt man wie Objekte; ein Klick auf einen
+- **Effekte** (Farbe, Wackeln, Blitz, Puls, Zoom, Neigen, Spiegeln, Dunkel) setzt man wie Objekte; ein Klick auf einen
   Effekt öffnet seine Einstellungen. Sie lösen aus, sobald die Spielfigur ihre Spalte erreicht
   (gestrichelte Linie), sind im Spiel unsichtbar und ändern die Physik nicht – ein geschafftes
   Level bleibt deshalb geschafft, wenn man nur Effekte ändert.
@@ -209,14 +227,19 @@ und kannst sie verstecken, wieder freigeben oder löschen.
 Die Level stehen in [`js/levels.js`](js/levels.js), entweder als Text-Karten
 (`#` Block, `^` Stachel, `o` Ring, `S` Raketen-Portal …, die Legende steht oben
 in der Datei) oder zusammengesetzt aus Bausteinen wie `pillars`, `stairs`,
-`padTower`, `orbChain`, `ship`, `grav` und `blue`. Die Reihenfolge im Menü
-legt die Liste `ORDER` am Ende der Datei fest. Nach jeder Änderung prüfen, ob das Level noch schaffbar ist:
+`padTower`, `orbChain`, `ship`, `grav` und `blue`, für Welt 2 `flyer` (Rakete, Ufo,
+Welle, Schaukel), `roller` (Kugel, Spinne), `robot`, `tele`, `greens`, `saws` und
+`gate`. Effekte setzt man mit `fx('color', { theme: 3 })` zwischen die Abschnitte;
+Level ohne eigene Effekte bekommen sie automatisch aus ihrem Aufbau (`autoFx`).
+Die Reihenfolge im Menü legt die Liste `ORDER` am Ende der Datei fest; neue Level
+kommen ans Ende, weil Farb-Trigger und Editor-Entwürfe die Nummern der Level benutzen. Nach jeder Änderung prüfen, ob das Level noch schaffbar ist:
 
 ```bash
 node tools/verify-levels.js
 ```
 
-`node tools/test-objects.js` prüft die Objekte aus dem Editor (Tempo, rosa Feld/Ring, Mini).
+`node tools/test-objects.js` prüft die Objekte und Modi (Tempo, Ringe, Felder, Mini,
+alle 8 Modi, Teleport, Säge, Portale über die ganze Höhe).
 
 Das Skript probiert per Breitensuche alle Eingabefolgen durch (mit höchstens
 30 Eingaben pro Sekunde, also menschlich machbar) und zeigt bei einem Fehler die
