@@ -22,7 +22,7 @@ function key(s, level, q) {
   const used = [];
   s.used.forEach((id) => { if (level.objects[id].hb[2] >= s.x - 0.5) used.push(id); });
   return [
-    Math.round(s.y * 40 / q), Math.round(s.vy * 4 / q), s.gs, s.mode,
+    Math.round(s.y * 40 / q), Math.round(s.vy * 4 / q), s.gs, s.mode, s.size, s.speed, Math.round(s.boost * 100),
     s.prevHeld ? 1 : 0, s.onGround ? 1 : 0, s.buffer > 0 ? 1 : 0,
     s.coins.size, used.join('.'),
   ].join('|');

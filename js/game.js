@@ -675,7 +675,7 @@
     const x = num(m.x, 0, 100000), y = num(m.y, -2, 12), r = num(m.r, -1000, 1000);
     if (x === null || y === null || r === null) return null;
     return {
-      x, y, r, m: m.m === 1 ? 1 : 0, g: m.g === -1 ? -1 : 1, d: m.d === 1 ? 1 : 0, w: m.w === 1 ? 1 : 0, race: num(m.race, 0, 1e9),
+      x, y, r, m: Number.isInteger(m.m) && m.m >= 0 && m.m < E.MODES.length ? m.m : 0, g: m.g === -1 ? -1 : 1, d: m.d === 1 ? 1 : 0, w: m.w === 1 ? 1 : 0, race: num(m.race, 0, 1e9),
       z: m.z === 0.5 ? 0.5 : 1, k: num(m.k, 0.5, 2) || 1,
     };
   }
@@ -786,7 +786,7 @@
     const s = game.state;
     const msg = {
       t: 's', race: mp.raceId, x: Math.round(s.x * 100) / 100, y: Math.round(s.y * 100) / 100,
-      r: Math.round(game.rot * 100) / 100, m: s.mode === 'ship' ? 1 : 0, g: s.gs, d: s.dead ? 1 : 0, w: s.won ? 1 : 0,
+      r: Math.round(game.rot * 100) / 100, m: Math.max(0, E.MODES.indexOf(s.mode)), g: s.gs, d: s.dead ? 1 : 0, w: s.won ? 1 : 0,
       z: s.size, k: s.speed,
     };
     if (mp.host) msg.id = mp.me;
@@ -921,7 +921,7 @@
       const cols = PLAYER_COLORS[p.color];
       ctx.save();
       ctx.globalAlpha = 0.5;
-      drawAvatar(r.sx, r.sy, r.r, r.m ? 'ship' : 'cube', r.g, cols, false, r.z);
+      drawAvatar(r.sx, r.sy, r.r, E.MODES[r.m] || 'cube', r.g, cols, false, r.z);
       ctx.restore();
       ctx.save();
       ctx.globalAlpha = 0.95;
@@ -1140,16 +1140,23 @@
       else if (ev === 'win') { onWin(); if (game.race) mpFinished(); }
       else if (ev === 'orb' || ev === 'pad') { game.jumps++; A.sfx(ev); shock(s.x + s.size / 2, s.y + s.size / 2, ev === 'pad' ? '#ffd84a' : '#ffffff', 10); }
       else if (ev === 'portal') { A.sfx('portal'); game.flash = 0.35; shock(s.x + s.size / 2, s.y + s.size / 2, fxColors().accent, 14); }
+      else if (ev === 'flip') ring(s.x + s.size / 2, s.y + s.size / 2, PLAYER_COLORS[save.color][0]);
+      else if (ev === 'spider') {
+        const a = Math.min(s.spiderFrom, s.y), b = Math.max(s.spiderFrom, s.y) + s.size;
+        particles.push({ streak: true, x: s.x + s.size / 2, y: a, y1: b, life: 0.25, max: 0.25, color: PLAYER_COLORS[save.color][0] });
+        ring(s.x + s.size / 2, s.y + s.size / 2, PLAYER_COLORS[save.color][0]);
+      }
       else if (ev === 'coin') { A.sfx('coin'); burst(s.x + 0.5, s.y + 0.5, ['#ffd84a', '#fff3b0'], 16, 5); shock(s.x + 0.5, s.y + 0.5, '#ffd84a', 8); }
     }
     s.events.length = 0;
     if (s.dead || s.won) return;
     if (fx.next < fx.list.length) fxUpdate(s.x);
     // Staub beim Landen
-    if (s.mode === 'cube' && s.onGround && !game.wasGround) dust(s.x, s.gs === 1 ? s.y : s.y + s.size, s.gs);
+    if (WALKERS[s.mode] && s.onGround && !game.wasGround) dust(s.x, s.gs === 1 ? s.y : s.y + s.size, s.gs);
     game.wasGround = s.onGround;
 
-    // Drehung des Würfels
+    // Drehung je nach Modus
+    const vx = C.SPEED * s.speed;
     if (s.mode === 'cube') {
       if (s.onGround) {
         const target = Math.round(game.rot / (Math.PI / 2)) * (Math.PI / 2);
@@ -1157,20 +1164,27 @@
       } else {
         game.rot += s.gs * 7.0 * dt;
       }
+    } else if (s.mode === 'ball') {
+      game.rot += s.gs * vx * dt * 2;                     // rollt
+    } else if (s.mode === 'wave') {
+      game.rot = -Math.atan2(s.vy, vx);                   // zeigt genau in Flugrichtung
+    } else if (s.mode === 'robot' || s.mode === 'spider') {
+      game.rot += (0 - game.rot) * Math.min(1, dt * 20);  // bleibt aufrecht
     } else {
-      const target = -Math.atan2(s.vy, C.SPEED * s.speed) * 0.9;
+      const k = s.mode === 'ufo' ? 0.35 : 0.9;
+      const target = -Math.atan2(s.vy, vx) * k;
       game.rot += (target - game.rot) * Math.min(1, dt * 20);
     }
 
     // automatische Checkpoints im Übungsmodus (nur am Boden = sicher)
-    if (game.practice && s.mode === 'cube' && s.onGround && s.time - game.lastAutoCp > 2.0) {
+    if (game.practice && WALKERS[s.mode] && s.onGround && s.time - game.lastAutoCp > 2.0) {
       placeCheckpoint(false);
     }
 
     // Spur-Partikel
     if (Math.random() < dt * 40) {
       const cols = PLAYER_COLORS[save.color];
-      if (s.mode === 'ship') {
+      if (s.mode === 'ship' || s.mode === 'swing' || s.mode === 'ufo') {
         particles.push({ x: s.x + 0.1, y: s.y + 0.5 + (Math.random() - 0.5) * 0.3, vx: -4 - Math.random() * 3, vy: (Math.random() - 0.5) * 2,
           life: 0.4, max: 0.4, size: 0.18, color: Math.random() < 0.5 ? '#ffb03b' : cols[1], square: false });
       } else if (s.onGround) {
@@ -1297,7 +1311,9 @@
       const p = particles[i];
       p.life -= dt;
       if (p.life <= 0) { particles.splice(i, 1); continue; }
-      if (p.conf) {
+      if (p.streak) {
+        /* bleibt stehen und verblasst */
+      } else if (p.conf) {
         p.x += (p.vx + Math.sin(time * 4 + p.ph) * 0.8) * dt; p.y += p.vy * dt;
         p.rot += p.spin * dt;
       } else if (!p.ring) {
@@ -1470,6 +1486,8 @@
     ship: ['#ff5ec8', 'Rakete'], cube: ['#7dff9a', 'Würfel'],
     gravUp: ['#ffd84a', '↑'], gravDown: ['#4aa8ff', '↓'],
     miniPortal: ['#ff9b3b', 'Mini'], bigPortal: ['#5ee6ff', 'Gross'],
+    ball: ['#ff5a3b', 'Kugel'], ufo: ['#c77dff', 'Ufo'], wave: ['#2fffd0', 'Welle'],
+    robot: ['#e8e8ff', 'Roboter'], spider: ['#6f7dff', 'Spinne'], swing: ['#ffb347', 'Schaukel'],
   };
   const SPEED_STYLE = { speed1: ['#ffb03b', 1], speed2: ['#5ee6ff', 2], speed3: ['#7dff9a', 3], speed4: ['#ff5ec8', 4] };
   /** Tempo-Portal: Rahmen mit 1–4 Pfeilen. */
@@ -1515,6 +1533,13 @@
     const k = (time * 1.5) % 1;
     ctx.beginPath(); ctx.ellipse(cx, cy, TS * 0.42 * k, TS * 1.5 * k, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
+    // kleines Bild des Modus im Portal
+    if (E.MODE_PORTALS[o.type]) {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      drawAvatar(o.x + 0.5 - 0.24, o.y + 0.5 - 0.24, 0, o.type, 1, [st[0], '#ffffff'], false, 0.48);
+      ctx.restore();
+    }
     ctx.textAlign = 'center';
     outlinedText(st[1], cx, cy - TS * 1.75, 14, st[0], 4);
   }
@@ -1593,6 +1618,18 @@
     ctx.save();
     ctx.lineCap = 'round';
     ctx.strokeStyle = cols[0];
+    if (s.mode === 'wave') {
+      // Welle: scharfe Zickzack-Linie
+      ctx.lineJoin = 'miter';
+      ctx.shadowColor = cols[0]; ctx.shadowBlur = 12;
+      ctx.lineWidth = Math.max(3, TS * s.size * 0.16);
+      ctx.beginPath();
+      ctx.moveTo(wx(t[0].x), wy(t[0].y));
+      for (let i = 1; i < t.length; i++) ctx.lineTo(wx(t[i].x), wy(t[i].y));
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     for (let i = 1; i < t.length; i++) {
       const k = i / t.length;
       ctx.globalAlpha = 0.35 * k;
@@ -1608,6 +1645,81 @@
     drawAvatar(s.x, s.y, game.rot, s.mode, s.gs, PLAYER_COLORS[save.color], true, s.size);
   }
 
+  // Modi, in denen man läuft (Staub beim Landen, Checkpoints am Boden)
+  const WALKERS = { cube: 1, ball: 1, robot: 1, spider: 1 };
+  /** Formen der neuen Modi; Mittelpunkt (0,0), eine Kachel gross, Schwerkraft nach unten. */
+  const AVATARS = {
+    ball(cols) {
+      ctx.fillStyle = cols[0]; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, TS * 0.47, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = cols[1];
+      ctx.beginPath(); ctx.arc(0, 0, TS * 0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(-TS * 0.47, 0); ctx.lineTo(TS * 0.47, 0); ctx.moveTo(0, -TS * 0.47); ctx.lineTo(0, TS * 0.47); ctx.stroke();
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(0, 0, TS * 0.1, 0, Math.PI * 2); ctx.fill();
+    },
+    ufo(cols) {
+      // Kuppel mit Würfel als Pilot, darunter die Scheibe
+      ctx.save(); ctx.translate(0, -TS * 0.14); drawCubeShape(TS * 0.42, cols); ctx.restore();
+      ctx.fillStyle = 'rgba(190,240,255,0.35)'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, TS * 0.08, TS * 0.33, Math.PI, 0); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = cols[1];
+      ctx.beginPath(); ctx.ellipse(0, TS * 0.16, TS * 0.56, TS * 0.2, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = cols[0];
+      for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.arc(i * TS * 0.26, TS * 0.17, TS * 0.06, 0, Math.PI * 2); ctx.fill(); }
+    },
+    wave(cols) {
+      ctx.fillStyle = cols[0]; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(TS * 0.5, 0); ctx.lineTo(-TS * 0.38, -TS * 0.36); ctx.lineTo(-TS * 0.16, 0); ctx.lineTo(-TS * 0.38, TS * 0.36);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = cols[1];
+      ctx.beginPath();
+      ctx.moveTo(TS * 0.24, 0); ctx.lineTo(-TS * 0.16, -TS * 0.15); ctx.lineTo(-TS * 0.05, 0); ctx.lineTo(-TS * 0.16, TS * 0.15);
+      ctx.closePath(); ctx.fill();
+    },
+    robot(cols) {
+      const step = Math.sin(time * 14) * TS * 0.12;
+      ctx.fillStyle = cols[1]; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+      // Beine
+      ctx.fillRect(-TS * 0.3 + step, TS * 0.18, TS * 0.18, TS * 0.3); ctx.strokeRect(-TS * 0.3 + step, TS * 0.18, TS * 0.18, TS * 0.3);
+      ctx.fillRect(TS * 0.1 - step, TS * 0.18, TS * 0.18, TS * 0.3); ctx.strokeRect(TS * 0.1 - step, TS * 0.18, TS * 0.18, TS * 0.3);
+      // Körper mit Würfel-Kopf
+      ctx.fillStyle = cols[0];
+      ctx.fillRect(-TS * 0.36, -TS * 0.02, TS * 0.72, TS * 0.24); ctx.strokeRect(-TS * 0.36, -TS * 0.02, TS * 0.72, TS * 0.24);
+      ctx.save(); ctx.translate(TS * 0.04, -TS * 0.24); drawCubeShape(TS * 0.5, cols); ctx.restore();
+      // Antenne
+      ctx.beginPath(); ctx.moveTo(TS * 0.04, -TS * 0.49); ctx.lineTo(TS * 0.04, -TS * 0.6); ctx.stroke();
+      ctx.fillStyle = '#ffe14a'; ctx.beginPath(); ctx.arc(TS * 0.04, -TS * 0.62, TS * 0.06, 0, Math.PI * 2); ctx.fill();
+    },
+    spider(cols) {
+      const k = Math.sin(time * 16) * TS * 0.06;
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+      for (let i = 0; i < 4; i++) {
+        const sx = (i - 1.5) * TS * 0.2, ex = (i - 1.5) * TS * 0.34 + (i % 2 ? k : -k);
+        ctx.beginPath(); ctx.moveTo(sx, TS * 0.05); ctx.lineTo(sx * 1.6, TS * 0.22); ctx.lineTo(ex, TS * 0.48); ctx.stroke();
+      }
+      ctx.strokeStyle = cols[1]; ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) {
+        const sx = (i - 1.5) * TS * 0.2, ex = (i - 1.5) * TS * 0.34 + (i % 2 ? k : -k);
+        ctx.beginPath(); ctx.moveTo(sx, TS * 0.05); ctx.lineTo(sx * 1.6, TS * 0.22); ctx.lineTo(ex, TS * 0.48); ctx.stroke();
+      }
+      ctx.fillStyle = cols[1]; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(0, TS * 0.04, TS * 0.4, TS * 0.2, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.save(); ctx.translate(0, -TS * 0.16); drawCubeShape(TS * 0.42, cols); ctx.restore();
+    },
+    swing(cols) {
+      ctx.fillStyle = cols[1]; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+      // zwei Flügel: oben und unten (die Schaukel fliegt in beide Richtungen)
+      ctx.beginPath(); ctx.moveTo(-TS * 0.5, -TS * 0.12); ctx.quadraticCurveTo(-TS * 0.1, -TS * 0.62, TS * 0.42, -TS * 0.3); ctx.lineTo(TS * 0.1, -TS * 0.12); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-TS * 0.5, TS * 0.12); ctx.quadraticCurveTo(-TS * 0.1, TS * 0.62, TS * 0.42, TS * 0.3); ctx.lineTo(TS * 0.1, TS * 0.12); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = cols[0];
+      ctx.beginPath(); ctx.arc(0, 0, TS * 0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      drawCubeShape(TS * 0.34, cols);
+    },
+  };
+
   function drawAvatar(x, y, rot, mode, gs, cols, glow, size) {
     const z = size || 1;
     const cx = wx(x + z / 2), cy = wy(y + z / 2);
@@ -1618,6 +1730,10 @@
     if (mode === 'cube') {
       ctx.rotate(rot);
       drawCubeShape(TS - 2, cols);
+    } else if (AVATARS[mode]) {
+      ctx.rotate(rot);
+      if (gs === -1 && mode !== 'ball' && mode !== 'wave') ctx.scale(1, -1);
+      AVATARS[mode](cols);
     } else {
       ctx.rotate(rot);
       if (gs === -1) ctx.scale(1, -1);
@@ -1643,7 +1759,14 @@
     for (const p of particles) {
       const a = Math.max(0, p.life / p.max);
       ctx.globalAlpha = a;
-      if (p.ring) {
+      if (p.streak) {
+        const w = TS * 0.5 * a;
+        const top = wy(p.y1), bot = wy(p.y);
+        const g = ctx.createLinearGradient(wx(p.x) - w, 0, wx(p.x) + w, 0);
+        g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, p.color); g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(wx(p.x) - w, top, w * 2, bot - top);
+      } else if (p.ring) {
         ctx.strokeStyle = p.color;
         ctx.lineWidth = p.big ? 5 * a + 1 : 3;
         ctx.beginPath();
@@ -1813,7 +1936,7 @@
     const s = game.state;
     const playColors = fxColors();
     camX = s.x - PLAYER_SCREEN_X;
-    const roofTarget = (s.mode === 'ship' || s.gs === -1) ? 1 : 0;
+    const roofTarget = (s.mode !== 'cube' && s.mode !== 'robot') || s.gs === -1 ? 1 : 0;
     game.roofAlpha += (roofTarget - game.roofAlpha) * 0.08;
 
     ctx.save();
@@ -1893,7 +2016,7 @@
     if (game.scene === 'play' && !game.paused && game.state && !game.state.dead) {
       const s = game.state;
       game.trail.push({ x: s.x + s.size / 2, y: s.y + s.size / 2 });
-      if (game.trail.length > 14) game.trail.shift();
+      while (game.trail.length > (s.mode === 'wave' ? 60 : 14)) game.trail.shift();
     }
     // kurze Zeitlupe direkt nach dem Ziel
     const slow = game.scene === 'win' && game.winTimer > 0.7 && !save.fxReduced ? 0.35 : 1;

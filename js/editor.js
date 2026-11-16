@@ -36,6 +36,8 @@
     { ch: 'p', name: 'Rosa Feld' }, { ch: 'r', name: 'Rosa Ring' },
     { ch: '1', name: 'Langsam' }, { ch: '2', name: 'Normal' }, { ch: '3', name: 'Schnell' }, { ch: '4', name: 'Sehr schnell' },
     { ch: 'K', name: 'Mini' }, { ch: 'N', name: 'Gross' },
+    { ch: 'B', name: 'Kugel' }, { ch: 'F', name: 'Ufo' }, { ch: 'W', name: 'Welle' },
+    { ch: 'R', name: 'Roboter' }, { ch: 'P', name: 'Spinne' }, { ch: 'X', name: 'Schaukel' },
     { ch: 'fx:color', name: 'Farbe', fx: 'color' }, { ch: 'fx:shake', name: 'Wackeln', fx: 'shake' },
     { ch: 'fx:flash', name: 'Blitz', fx: 'flash' }, { ch: 'fx:pulse', name: 'Puls', fx: 'pulse' },
     { ch: 'fx:zoom', name: 'Zoom', fx: 'zoom' },
@@ -335,6 +337,12 @@
       case 'b': circle(6, '#4aa8ff'); circle(11, null, '#4aa8ff'); break;
       case 'c': circle(10, '#ffd84a', '#b88a00'); break;
       case 'S': portal('#ff5ec8'); break;
+      case 'B': case 'F': case 'W': case 'R': case 'P': case 'X': {
+        const look = { B: ['#ff5a3b', 'K'], F: ['#c77dff', 'U'], W: ['#2fffd0', 'W'], R: ['#c9c9ff', 'R'], P: ['#6f7dff', 'S'], X: ['#ffb347', 'S'] }[t.ch];
+        portal(look[0]);
+        c.fillStyle = ink; c.font = 'bold 12px sans-serif'; c.textAlign = 'center'; c.fillText(look[1], 16, 20);
+        break;
+      }
       case 'C': portal('#7dff9a'); break;
       case 'U': portal('#ffd84a'); c.fillStyle = ink; c.font = 'bold 14px sans-serif'; c.textAlign = 'center'; c.fillText('↑', 16, 21); break;
       case 'D': portal('#4aa8ff'); c.fillStyle = ink; c.font = 'bold 14px sans-serif'; c.textAlign = 'center'; c.fillText('↓', 16, 21); break;

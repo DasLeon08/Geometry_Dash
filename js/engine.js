@@ -26,7 +26,19 @@
     PINK: 0.72,         // rosa Sprungfeld / Ring: kleinerer Sprung
     MINI_SIZE: 0.5,     // Mini-Würfel: halbe Grösse
     MINI_JUMP: 0.82,    // Mini-Würfel springt etwas weniger hoch
+    BALL_G: 0.85,       // Kugel: Anteil der normalen Schwerkraft
+    BALL_PUSH: 4,       // Kugel: Anschub beim Umdrehen
+    UFO_G: 0.55,        // Ufo: Anteil der normalen Schwerkraft
+    UFO_V: 11,          // Ufo: Sprung in der Luft
+    UFO_MAX: 14,        // Ufo: max. Fallgeschwindigkeit
+    ROBOT_V: 12,        // Roboter: Steiggeschwindigkeit
+    ROBOT_T: 0.2,       // Roboter: so lange trägt der Schub beim Halten
+    SWING_G: 40,        // Schaukel: Beschleunigung Richtung Schwerkraft
   };
+  // Spielmodi; die Nummer wird im Mehrspieler verschickt
+  const MODES = ['cube', 'ship', 'ball', 'ufo', 'wave', 'robot', 'spider', 'swing'];
+  // Flieger gleiten an Blöcken oben und unten entlang
+  const FLYERS = { ship: 1, ufo: 1, wave: 1, swing: 1 };
   // Tempo-Portale: langsam, normal, schnell, sehr schnell
   const SPEEDS = { speed1: 0.8, speed2: 1, speed3: 1.3, speed4: 1.6 };
 
@@ -51,13 +63,24 @@
     '4': 'speed4',
     'K': 'miniPortal',
     'N': 'bigPortal',
+    'B': 'ball',
+    'F': 'ufo',
+    'W': 'wave',
+    'R': 'robot',
+    'P': 'spider',
+    'X': 'swing',
   };
 
   const HAZARDS = { spike: 1, spikeDown: 1, mini: 1 };
-  const PORTALS = { ship: 1, cube: 1, gravUp: 1, gravDown: 1, speed1: 1, speed2: 1, speed3: 1, speed4: 1, miniPortal: 1, bigPortal: 1 };
+  const PORTALS = {
+    ship: 1, cube: 1, ball: 1, ufo: 1, wave: 1, robot: 1, spider: 1, swing: 1,
+    gravUp: 1, gravDown: 1, speed1: 1, speed2: 1, speed3: 1, speed4: 1, miniPortal: 1, bigPortal: 1,
+  };
 
   // Spielmodus-Portale wirken über die ganze Höhe: man kann sie nicht umfliegen
-  const MODE_PORTALS = { ship: 1, cube: 1 };
+  const MODE_PORTALS = { ship: 1, cube: 1, ball: 1, ufo: 1, wave: 1, robot: 1, spider: 1, swing: 1 };
+  // so stark wird die senkrechte Geschwindigkeit beim Wechsel in den Modus gedämpft
+  const MODE_DAMP = { ship: 0.4, cube: 1, ball: 0.5, ufo: 0.5, wave: 1, robot: 1, spider: 1, swing: 0.4 };
 
   function hitbox(type, x, y) {
     if (MODE_PORTALS[type]) return [x + 0.1, 0, x + 0.9, C.ROOF];
@@ -141,7 +164,8 @@
     return {
       x: 0, y: 0, vy: 0,
       gs: 1,              // 1 = normale Schwerkraft, -1 = umgekehrt
-      mode: 'cube',       // 'cube' | 'ship'
+      mode: 'cube',       // siehe MODES
+      boost: 0,           // Roboter: verbleibende Schub-Zeit
       size: 1,            // 1 = normal, 0.5 = Mini
       speed: 1,           // Tempo-Faktor (Tempo-Portale)
       onGround: true,
@@ -169,6 +193,34 @@
     return ax0 < b[2] - e && ax1 > b[0] + e && ay0 < b[3] - e && ay1 > b[1] + e;
   }
 
+  /**
+   * Spinne: springt sofort an die nächste Fläche gegenüber (Unterseite eines
+   * Blocks darüber oder die Decke; bei umgekehrter Schwerkraft nach unten).
+   */
+  function spiderJump(s, level, z) {
+    const e = 1e-6;
+    const x0 = s.x + e, x1 = s.x + z - e;
+    const c0 = Math.max(0, Math.floor(s.x)), c1 = Math.min(level.cols.length - 1, Math.floor(s.x + z));
+    let target = s.gs === 1 ? C.ROOF : 0;
+    for (let c = c0; c <= c1; c++) {
+      const col = level.cols[c];
+      for (let k = 0; k < col.length; k++) {
+        const b = col[k].hb;
+        if (col[k].type !== 'block' || b[2] <= x0 || b[0] >= x1) continue;
+        if (s.gs === 1 && b[1] >= s.y + z - e && b[1] < target) target = b[1];
+        if (s.gs === -1 && b[3] <= s.y + e && b[3] > target) target = b[3];
+      }
+    }
+    const from = s.y;
+    s.y = s.gs === 1 ? target - z : target;
+    s.gs = -s.gs;
+    s.vy = 0;
+    s.buffer = 0;
+    s.onGround = true;
+    s.spiderFrom = from;
+    s.events.push('spider');
+  }
+
   /** Einen festen Zeitschritt simulieren. held = Taste/Finger gedrückt. */
   function step(s, level, held, dt) {
     if (s.dead || s.won) return s;
@@ -181,25 +233,76 @@
     const z = s.size;
     s.x += C.SPEED * s.speed * dt;
 
-    if (s.mode === 'cube') {
+    const mini = z < 1 ? C.MINI_JUMP : 1;
+    const mode = s.mode;
+    if (mode === 'cube') {
       if (s.onGround && (held || s.buffer > 0)) {
-        s.vy = s.gs * (z < 1 ? C.JUMP_V * C.MINI_JUMP : C.JUMP_V);
+        s.vy = s.gs * C.JUMP_V * mini;
         s.onGround = false;
         s.buffer = 0;
         s.events.push('jump');
       }
       s.vy -= s.gs * C.GRAVITY * dt;
       if (s.vy * s.gs < -C.MAX_FALL) s.vy = -s.gs * C.MAX_FALL;
-    } else {
+    } else if (mode === 'ship') {
       const acc = held ? C.SHIP_UP : -C.SHIP_DOWN;
       s.vy += s.gs * acc * dt;
+      if (s.vy > C.SHIP_MAX) s.vy = C.SHIP_MAX;
+      if (s.vy < -C.SHIP_MAX) s.vy = -C.SHIP_MAX;
+    } else if (mode === 'ball') {
+      // am Boden tippen: Schwerkraft umdrehen und zur anderen Seite rollen
+      if (s.onGround && (pressed || s.buffer > 0)) {
+        s.gs = -s.gs;
+        s.vy = -s.gs * C.BALL_PUSH;
+        s.onGround = false;
+        s.buffer = 0;
+        s.events.push('flip');
+      }
+      s.vy -= s.gs * C.GRAVITY * C.BALL_G * dt;
+      if (s.vy * s.gs < -C.MAX_FALL) s.vy = -s.gs * C.MAX_FALL;
+    } else if (mode === 'ufo') {
+      // jedes Tippen ein kleiner Sprung, auch in der Luft (Ringe dürfen denselben Tipp noch nutzen)
+      if (pressed) { s.vy = s.gs * C.UFO_V * mini; s.onGround = false; s.events.push('jump'); }
+      s.vy -= s.gs * C.GRAVITY * C.UFO_G * dt;
+      if (s.vy * s.gs < -C.UFO_MAX) s.vy = -s.gs * C.UFO_MAX;
+    } else if (mode === 'wave') {
+      // schräg hoch beim Halten, schräg runter beim Loslassen; Mini doppelt so steil
+      const w = C.SPEED * s.speed * (z < 1 ? 2 : 1);
+      s.vy = held ? s.gs * w : -s.gs * w;
+    } else if (mode === 'robot') {
+      if (s.onGround && (held || s.buffer > 0)) {
+        s.boost = C.ROBOT_T;
+        s.onGround = false;
+        s.buffer = 0;
+        s.events.push('jump');
+      }
+      if (s.boost > 0 && held) {
+        // je länger gehalten, desto höher
+        s.vy = s.gs * C.ROBOT_V * mini;
+        s.boost -= dt;
+      } else {
+        s.boost = 0;
+        s.vy -= s.gs * C.GRAVITY * dt;
+        if (s.vy * s.gs < -C.MAX_FALL) s.vy = -s.gs * C.MAX_FALL;
+      }
+    } else if (mode === 'spider') {
+      if (s.onGround && (pressed || s.buffer > 0)) {
+        spiderJump(s, level, z);
+      } else {
+        s.vy -= s.gs * C.GRAVITY * dt;
+        if (s.vy * s.gs < -C.MAX_FALL) s.vy = -s.gs * C.MAX_FALL;
+      }
+    } else if (mode === 'swing') {
+      if (pressed) { s.gs = -s.gs; s.events.push('flip'); }
+      s.vy -= s.gs * C.SWING_G * dt;
       if (s.vy > C.SHIP_MAX) s.vy = C.SHIP_MAX;
       if (s.vy < -C.SHIP_MAX) s.vy = -C.SHIP_MAX;
     }
     s.y += s.vy * dt;
     s.onGround = false;
 
-    const ship = s.mode === 'ship';
+    const ship = !!FLYERS[mode];      // gleitet oben und unten
+    const air = mode === 'ship' || mode === 'swing';   // Sprungfelder/Ringe wirken schwächer
     const c0 = Math.max(0, Math.floor(s.x) - 1);
     const c1 = Math.min(level.cols.length - 1, Math.floor(s.x) + 2);
     const seen = [];
@@ -265,7 +368,7 @@
         } else if (t === 'pad' || t === 'padPink') {
           if (!s.used.has(o.id)) {
             s.used.add(o.id);
-            s.vy = s.gs * C.PAD_V * (ship ? 0.5 : 1) * (t === 'padPink' ? C.PINK : 1);
+            s.vy = s.gs * C.PAD_V * (air ? 0.5 : 1) * (t === 'padPink' ? C.PINK : 1);
             s.onGround = false;
             s.events.push('pad');
           }
@@ -275,7 +378,7 @@
             s.buffer = 0;
             s.onGround = false;
             if (t === 'orb' || t === 'orbPink') {
-              s.vy = s.gs * C.ORB_V * (ship ? 0.6 : 1) * (t === 'orbPink' ? C.PINK : 1);
+              s.vy = s.gs * C.ORB_V * (air ? 0.6 : 1) * (t === 'orbPink' ? C.PINK : 1);
             } else {
               s.gs = -s.gs;
               s.vy = -s.gs * C.BLUE_ORB_V;
@@ -283,10 +386,8 @@
             s.events.push('orb');
           }
         } else if (PORTALS[t]) {
-          if (t === 'ship' && s.mode !== 'ship') {
-            s.mode = 'ship'; s.vy *= 0.4; s.events.push('portal');
-          } else if (t === 'cube' && s.mode !== 'cube') {
-            s.mode = 'cube'; s.events.push('portal');
+          if (MODE_PORTALS[t]) {
+            if (s.mode !== t) { s.mode = t; s.vy *= MODE_DAMP[t]; s.boost = 0; s.events.push('portal'); }
           } else if (t === 'gravUp' && s.gs === 1) {
             s.gs = -1; s.vy *= 0.5; s.onGround = false; s.events.push('portal');
           } else if (t === 'gravDown' && s.gs === -1) {
@@ -381,7 +482,7 @@
     return out.sort((a, b) => a.x - b.x || a.y - b.y);
   }
 
-  const Engine = { C, MODE_PORTALS, parseLevel, createState, cloneState, step, runReplay, CHAR_TYPES, SPEEDS, FX, fxDefaults, cleanExtras, MAX_EXTRAS };
+  const Engine = { C, MODES, FLYERS, MODE_PORTALS, parseLevel, createState, cloneState, step, runReplay, CHAR_TYPES, SPEEDS, FX, fxDefaults, cleanExtras, MAX_EXTRAS };
   if (typeof module !== 'undefined' && module.exports) module.exports = Engine;
   else root.Engine = Engine;
 })(this);
