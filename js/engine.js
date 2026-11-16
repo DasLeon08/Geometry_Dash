@@ -484,13 +484,18 @@
    *   color: Farben eines eingebauten Levels (theme) mit Übergang (fade, s)
    *   shake: Wackeln (power 1–3, dur s)   flash: Blitz (color 0–5, dur s)
    *   pulse: Puls im Takt (power 1–3, dur s)   zoom: Heranzoomen (zoom 1–1.3, dur s)
+   *   tilt: Kamera neigen (angle −15…15 Grad, dur s)   mirror: Bild spiegeln (on 0/1, dur s)
+   *   dark: Dunkel mit Licht um die Spielfigur (power 0–1, 0 = wieder hell; dur s)
    */
   const FX = {
-    color: { theme: [0, 14, 0, true], fade: [0, 3, 1] },
+    color: { theme: [0, 29, 0, true], fade: [0, 3, 1] },
     shake: { power: [1, 3, 2, true], dur: [0.1, 2, 0.6] },
     flash: { color: [0, 5, 0, true], dur: [0.1, 1.5, 0.5] },
     pulse: { power: [1, 3, 2, true], dur: [0.5, 10, 4] },
     zoom: { zoom: [1, 1.3, 1.15], dur: [0.1, 3, 1] },
+    tilt: { angle: [-15, 15, 8, true], dur: [0, 3, 1] },
+    mirror: { on: [0, 1, 1, true], dur: [0, 2, 0.6] },
+    dark: { power: [0, 1, 0.75], dur: [0, 3, 1] },
   };
   const MAX_EXTRAS = 200;
   function fxDefaults(t) {

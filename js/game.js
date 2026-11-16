@@ -1214,10 +1214,17 @@
     fx.next = 0;
     fx.base = def.colors;
     fx.color = null; fx.zoom = null; fx.pulseUntil = 0;
+    fx.tilt = null; fx.mirror = null; fx.dark = null;
     fx.flashRgb = FLASH_COLORS[0]; fx.flashDecay = 2; fx.shakePower = 1;
+    // Trigger vor dem Start: bleibende Zustände sofort übernehmen
+    const still = (v) => ({ from: v, to: v, t0: 0, dur: 0 });
     while (fx.next < fx.list.length && fx.list[fx.next].x < startX) {
-      const e = fx.list[fx.next++];
-      if (e.t === 'color') fx.base = window.LEVELS[e.p.theme].colors;
+      const e = fx.list[fx.next++], p = e.p;
+      if (e.t === 'color') fx.base = themeColors(p.theme);
+      else if (e.t === 'zoom') fx.zoom = still(p.zoom);
+      else if (e.t === 'tilt') fx.tilt = still(save.fxReduced ? 0 : p.angle);
+      else if (e.t === 'mirror') fx.mirror = still(p.on ? -1 : 1);
+      else if (e.t === 'dark') fx.dark = still(p.power);
     }
   }
   function fxUpdate(x) {
@@ -1226,12 +1233,26 @@
   function fxFire(e) {
     const p = e.p;
     const soft = save.fxReduced;
-    if (e.t === 'color') fx.color = { from: fxColors(), to: window.LEVELS[p.theme].colors, t0: time, dur: p.fade };
+    if (e.t === 'color') fx.color = { from: fxColors(), to: themeColors(p.theme), t0: time, dur: p.fade };
     else if (e.t === 'shake') { game.shake = Math.max(game.shake, soft ? p.dur * 0.4 : p.dur); fx.shakePower = soft ? 0.5 : p.power; }
     else if (e.t === 'flash') { fx.flashRgb = FLASH_COLORS[p.color]; game.flash = soft ? 0.35 : 1; fx.flashDecay = 1 / p.dur; }
     else if (e.t === 'pulse') { fx.pulseUntil = time + p.dur; fx.pulsePower = soft ? 1 : p.power; }
     else if (e.t === 'zoom') fx.zoom = { from: fxZoom(), to: p.zoom, t0: time, dur: p.dur };
+    else if (e.t === 'tilt') fx.tilt = { from: fxTilt(), to: soft ? 0 : p.angle, t0: time, dur: p.dur };
+    else if (e.t === 'mirror') fx.mirror = { from: fxMirror(), to: p.on ? -1 : 1, t0: time, dur: soft ? 0 : p.dur };
+    else if (e.t === 'dark') fx.dark = { from: fxDark(), to: p.power, t0: time, dur: p.dur };
   }
+  function themeColors(i) { return (window.LEVELS[i] || window.LEVELS[0]).colors; }
+  /** Wert eines laufenden Übergangs, sanft an- und auslaufend. */
+  function animVal(a, def) {
+    if (!a) return def;
+    const k = a.dur > 0 ? Math.min(1, (time - a.t0) / a.dur) : 1;
+    const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    return a.from + (a.to - a.from) * e;
+  }
+  function fxTilt() { return animVal(fx.tilt, 0); }
+  function fxMirror() { return animVal(fx.mirror, 1); }
+  function fxDark() { return animVal(fx.dark, 0); }
   function lerpHex(a, b, k) {
     const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16);
     const c = (sh) => Math.round(((x >> sh) & 255) + ((((y >> sh) & 255) - ((x >> sh) & 255)) * k));
@@ -1246,12 +1267,7 @@
     const f = fx.color.from, t = fx.color.to;
     return { bgTop: lerpHex(f.bgTop, t.bgTop, k), bgBottom: lerpHex(f.bgBottom, t.bgBottom, k), accent: lerpHex(f.accent, t.accent, k), ground: lerpHex(f.ground, t.ground, k) };
   }
-  function fxZoom() {
-    if (!fx.zoom) return 1;
-    const k = fx.zoom.dur > 0 ? Math.min(1, (time - fx.zoom.t0) / fx.zoom.dur) : 1;
-    const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;   // sanft an- und auslaufen
-    return fx.zoom.from + (fx.zoom.to - fx.zoom.from) * e;
-  }
+  function fxZoom() { return animVal(fx.zoom, 1); }
 
   // ---------------------------------------------------------------------
   // Partikel
@@ -1975,6 +1991,20 @@
       const m = game.shake * 14 * fx.shakePower * (save.fxReduced ? 0.3 : 1);
       ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m);
     } else fx.shakePower = 1;
+    // Neigen und Spiegeln (Trigger) um die Bildmitte; Ecken in Hintergrundfarbe
+    const tilt = fxTilt() * Math.PI / 180, mirror = fxMirror();
+    if (tilt !== 0 || mirror !== 1) {
+      const gy = Math.max(0.05, Math.min(0.95, groundY / viewH));
+      const cg = ctx.createLinearGradient(0, 0, 0, viewH);
+      cg.addColorStop(0, playColors.bgTop); cg.addColorStop(gy, playColors.bgBottom); cg.addColorStop(Math.min(1, gy + 0.01), playColors.ground);
+      ctx.fillStyle = cg;
+      ctx.fillRect(0, 0, viewW, viewH);
+      const k = 1 + Math.abs(Math.sin(tilt)) * 0.7;
+      ctx.translate(viewW / 2, viewH / 2);
+      ctx.rotate(tilt);
+      ctx.scale(mirror * k, k);
+      ctx.translate(-viewW / 2, -viewH / 2);
+    }
     const pulsing = time < fx.pulseUntil ? fx.pulsePower : 0;
     drawBackground(playColors, pulse * pulse * (1 + pulsing * 1.5));
     // Zoom (Trigger) und Puls im Takt: um die Spielfigur herum vergrössern
@@ -1993,7 +2023,21 @@
     drawGhosts();
     drawTrail();
     drawPlayer();
+    // Bildschirm-Position der Spielfigur für das Licht im Dunkeln
+    const dark = fxDark();
+    if (dark > 0.01) {
+      const m = ctx.getTransform();
+      const pt = m.transformPoint(new DOMPoint(wx(s.x + s.size / 2), wy(s.y + s.size / 2)));
+      game.lightX = pt.x / scale; game.lightY = pt.y / scale;
+    }
     ctx.restore();
+    if (dark > 0.01) {
+      const g = ctx.createRadialGradient(game.lightX, game.lightY, TS * 1.1, game.lightX, game.lightY, TS * 5.5);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(1, 'rgba(0,0,0,' + (dark * 0.93).toFixed(3) + ')');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, viewW, viewH);
+    }
 
     if (game.flash > 0) {
       ctx.fillStyle = 'rgba(' + fx.flashRgb + ',' + (game.flash * (save.fxReduced ? 0.2 : 0.5)) + ')';

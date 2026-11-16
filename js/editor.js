@@ -43,6 +43,8 @@
     { ch: 'fx:color', name: 'Farbe', fx: 'color' }, { ch: 'fx:shake', name: 'Wackeln', fx: 'shake' },
     { ch: 'fx:flash', name: 'Blitz', fx: 'flash' }, { ch: 'fx:pulse', name: 'Puls', fx: 'pulse' },
     { ch: 'fx:zoom', name: 'Zoom', fx: 'zoom' },
+    { ch: 'fx:tilt', name: 'Neigen', fx: 'tilt' }, { ch: 'fx:mirror', name: 'Spiegeln', fx: 'mirror' },
+    { ch: 'fx:dark', name: 'Dunkel', fx: 'dark' },
     { ch: '.', name: 'Radierer', erase: true }, { ch: 'hand', name: 'Hand', hand: true },
   ];
   const FX_LOOK = {
@@ -51,9 +53,12 @@
     flash: { col: '#ffe066', sym: '✶', title: 'Blitz', hint: 'Ein kurzer Lichtblitz in einer Farbe.' },
     pulse: { col: '#ff6fa8', sym: '◎', title: 'Puls', hint: 'Hintergrund und Objekte pulsieren stärker im Takt der Musik.' },
     zoom: { col: '#4cc9f0', sym: '⊕', title: 'Zoom', hint: 'Zoomt um die Spielfigur heran (1 = normal).' },
+    tilt: { col: '#7dff9a', sym: '⟋', title: 'Neigen', hint: 'Neigt die Kamera (0 = gerade).' },
+    mirror: { col: '#ffffff', sym: '⇋', title: 'Spiegeln', hint: 'Spiegelt das Bild links/rechts (1 = an, 0 = aus).' },
+    dark: { col: '#5a4a8a', sym: '●', title: 'Dunkel', hint: 'Macht es dunkel, nur um die Spielfigur bleibt Licht (0 = wieder hell).' },
   };
   const FLASH_SWATCHES = ['#ffffff', '#ffe066', '#5ee6ff', '#ff5ec8', '#7dff9a', '#ff5a5a'];
-  const FX_LABELS = { fade: 'Übergang (s)', power: 'Stärke', dur: 'Dauer (s)', zoom: 'Zoom' };
+  const FX_LABELS = { fade: 'Übergang (s)', power: 'Stärke', dur: 'Dauer (s)', zoom: 'Zoom', angle: 'Winkel (°)', on: 'An (1) / Aus (0)' };
 
   // ---------------------------------------------------------------------
   // Entwürfe speichern und laden (alles wird geprüft, es kommt aus dem Speicher)

@@ -353,9 +353,76 @@
     const out = [];
     for (let i = 0; i < arguments.length; i++) {
       const it = arguments[i];
-      if (typeof it[0] === 'string') out.push(it);
+      if (it.fx || typeof it[0] === 'string') out.push(it);
       else it.forEach((x) => out.push(x));
     }
+    return out;
+  }
+  /**
+   * Effekt-Trigger zwischen Abschnitten: fx('color', { theme: 3, fade: 1 }, dx, y).
+   * Wird beim Laden in def.extras umgewandelt (x = Spalte, an der er steht, + dx).
+   */
+  function fx(t, p, dx, y) { return { fx: true, t, p: p || {}, dx: dx || 0, y: y === undefined ? 5 : y }; }
+
+  /** Effekt-Marken aus der Karte holen und als extras ablegen. */
+  function takeFx(def) {
+    const map = [], extras = [];
+    let x = 0;
+    def.map.forEach((it) => {
+      if (it.fx) { extras.push({ x: x + it.dx, y: it.y, t: it.t, p: it.p }); return; }
+      map.push(it);
+      x += Math.max.apply(null, it.map((r) => r.length));
+    });
+    def.map = map;
+    if (extras.length) def.extras = (def.extras || []).concat(extras);
+  }
+
+  /**
+   * Effekte für Level ohne eigene Trigger: aus dem Aufbau abgeleitet.
+   * Start-Drop: Blitz + Puls; Rakete: andere Farben + Zoom; Schwerkraft: Neigen;
+   * vor dem Ziel: Puls. Ändert nur die Optik, nicht die Strecke.
+   */
+  function autoFx(def, own, partner) {
+    const out = [];
+    const at = (x, t, p, y) => out.push({ x, y: y === undefined ? 5 : y, t, p });
+    let x = 0, len = 0;
+    def.map.forEach((rows) => { len += Math.max.apply(null, rows.map((r) => r.length)); });
+    at(18, 'flash', { color: 0, dur: 0.4 }, 6);
+    at(18, 'pulse', { power: 2, dur: 6 }, 4);
+    let inShip = false;
+    def.map.forEach((rows) => {
+      const w = Math.max.apply(null, rows.map((r) => r.length));
+      for (let j = 0; j < w; j++) {
+        for (let i = 0; i < rows.length; i++) {
+          const ch = rows[i][j];
+          const cx = x + j;
+          if (ch === 'S' && !inShip) {
+            inShip = true;
+            at(cx, 'color', { theme: partner, fade: 0.6 }, 8);
+            at(cx, 'zoom', { zoom: 1.1, dur: 1.2 }, 7);
+            at(cx, 'pulse', { power: 3, dur: 4 }, 6);
+          } else if (ch === 'C' && inShip) {
+            inShip = false;
+            at(cx, 'color', { theme: own, fade: 0.8 }, 8);
+            at(cx, 'zoom', { zoom: 1, dur: 0.8 }, 7);
+            at(cx, 'flash', { color: 2, dur: 0.5 }, 6);
+          } else if (ch === 'U') {
+            at(cx, 'tilt', { angle: -5, dur: 1 }, 8);
+          } else if (ch === 'D') {
+            at(cx, 'tilt', { angle: 0, dur: 0.8 }, 2);
+            at(cx, 'shake', { power: 1, dur: 0.3 }, 3);
+          }
+        }
+      }
+      x += w;
+    });
+    if (!out.some((e) => e.t === 'color')) {
+      // ohne Raketen-Abschnitt: Farbwechsel in der Mitte, kurz vor dem Ziel zurück
+      at(Math.round(len / 2), 'color', { theme: partner, fade: 2 }, 8);
+      at(Math.round(len / 2), 'shake', { power: 1, dur: 0.3 }, 3);
+      at(Math.max(20, len - 60), 'color', { theme: own, fade: 1.5 }, 8);
+    }
+    at(Math.max(20, len - 60), 'pulse', { power: 3, dur: 6 }, 5);
     return out;
   }
   const START = run('..................');
@@ -601,6 +668,10 @@
   ];
   const ALL = LEVELS.concat(MORE);
   const SORTED = ORDER.map((id) => ALL.find((l) => l.id === id));
+  SORTED.forEach((def, i) => {
+    takeFx(def);
+    if (!def.extras) def.extras = autoFx(def, i, (i + 5) % 15);
+  });
 
   if (typeof module !== 'undefined' && module.exports) module.exports = SORTED;
   else root.LEVELS = SORTED;

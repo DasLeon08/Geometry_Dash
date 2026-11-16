@@ -29,7 +29,7 @@ const MIN_OBJECTS = 5;
 const MAX_TOGGLES = 50000;
 const MAX_BODY = 64 * 1024;
 const HIDE_AT_REPORTS = 5;
-const THEMES = 15;
+const THEMES = 30;   // Farben/Musik der eingebauten Level (Welt 1 + 2)
 
 const MESSAGES = {
   name: 'Dieser Name ist nicht erlaubt. Bitte wähle einen anderen.',
