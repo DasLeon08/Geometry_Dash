@@ -150,6 +150,27 @@ ok(Object.keys(E.MODE_PORTALS).every((t) => {
   ok(s.won && rr.won && rr.steps === i, 'Lauf durch alle Modi ist nachspielbar (' + i + ' Schritte)');
 }
 
+// ---- Neue Ringe, Felder, Teleport, Säge ----
+{
+  const tap = (s) => (s.x > 6.0 && s.x < 6.05) || (s.x > 9.4 && s.x < 9.45);
+  const g = run(rowsWith(40, [['g', 10, 2]]), 25, tap);
+  ok(g.s.gs === -1 && g.s.y + 1 === E.C.ROOF, 'grüner Ring dreht die Schwerkraft (landet an der Decke)');
+  // schwarzer Ring: nach einem Sprung schneller wieder am Boden
+  const land = (items) => { const lvl = E.parseLevel({ map: [rowsWith(40, items)] }); const st = E.createState(); let n = 0, jumped = false;
+    while (st.x < 25) { const h = (st.x > 8 && st.x < 8.05) || (st.x > 9.4 && st.x < 9.45); E.step(st, lvl, h, E.C.DT); if (st.y > 0.5) jumped = true; if (jumped && st.y === 0) break; n++; } return st.x; };
+  ok(land([['n', 10, 2]]) < land([]) - 0.8, 'schwarzer Ring drückt schnell nach unten (' + land([['n', 10, 2]]).toFixed(2) + ' statt ' + land([]).toFixed(2) + ')');
+  const u = run(rowsWith(40, [['u', 8, 0]]), 20);
+  ok(u.s.gs === -1 && u.s.y + 1 === E.C.ROOF, 'blaues Sprungfeld schickt an die Decke');
+  const tp = run(rowsWith(40, [['T', 8, 1], ['t', 8, 7]]), 12);
+  ok(tp.maxY > 6.5 && tp.maxY < 7.6 && !tp.s.dead, 'Teleport bringt auf die Höhe des Ausgangs (y=' + tp.maxY.toFixed(2) + ')');
+  const tpNo = run(rowsWith(40, [['T', 8, 1]]), 12);
+  ok(tpNo.maxY < 0.01, 'Teleport ohne Ausgang tut nichts');
+  const saw = run(rowsWith(40, [['z', 10, 0]]), 20);
+  ok(saw.s.dead, 'Sägeblatt ist tödlich');
+  const sawOver = run(rowsWith(40, [['z', 10, 0]]), 20, (s) => s.x > 7.6 && s.x < 7.7);
+  ok(!sawOver.s.dead, 'über das Sägeblatt springen geht');
+}
+
 // Nachspielen mit neuen Objekten
 const lv = { map: [rowsWith(60, [['3', 4, 1], ['p', 14, 0], ['c', 25, 2], ['K', 30, 1], ['c', 40, 1], ['N', 45, 1], ['c', 50, 2]])] };
 const rr = E.runReplay(lv, { h0: false, t: [] });

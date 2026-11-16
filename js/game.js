@@ -1140,6 +1140,12 @@
       else if (ev === 'win') { onWin(); if (game.race) mpFinished(); }
       else if (ev === 'orb' || ev === 'pad') { game.jumps++; A.sfx(ev); shock(s.x + s.size / 2, s.y + s.size / 2, ev === 'pad' ? '#ffd84a' : '#ffffff', 10); }
       else if (ev === 'portal') { A.sfx('portal'); game.flash = 0.35; shock(s.x + s.size / 2, s.y + s.size / 2, fxColors().accent, 14); }
+      else if (ev === 'teleport') {
+        A.sfx('portal');
+        const a = Math.min(s.tpFrom, s.y), b = Math.max(s.tpFrom, s.y) + s.size;
+        particles.push({ streak: true, x: s.x + s.size / 2, y: a, y1: b, life: 0.3, max: 0.3, color: '#00d0ff' });
+        shock(s.x + s.size / 2, s.y + s.size / 2, '#ff7a00', 10);
+      }
       else if (ev === 'flip') ring(s.x + s.size / 2, s.y + s.size / 2, PLAYER_COLORS[save.color][0]);
       else if (ev === 'spider') {
         const a = Math.min(s.spiderFrom, s.y), b = Math.max(s.spiderFrom, s.y) + s.size;
@@ -1448,14 +1454,16 @@
     ctx.stroke();
   }
 
+  const ORB_COLORS = { orb: '#ffe14a', orbPink: '#ff6fd1', gorb: '#4aa8ff', orbGreen: '#5dff6a', orbBlack: '#ffffff' };
   function drawOrb(o, pulse) {
     const cx = wx(o.x + 0.5), cy = wy(o.y + 0.5);
     const used = game.state && game.state.used.has(o.id);
-    const col = o.type === 'orb' ? '#ffe14a' : o.type === 'orbPink' ? '#ff6fd1' : '#4aa8ff';
+    const col = ORB_COLORS[o.type];
+    const black = o.type === 'orbBlack';
     ctx.save();
     ctx.globalAlpha = used ? 0.35 : 1;
-    ctx.shadowColor = col; ctx.shadowBlur = 20;
-    ctx.fillStyle = col;
+    ctx.shadowColor = black ? '#ffffff' : col; ctx.shadowBlur = 20;
+    ctx.fillStyle = black ? '#111118' : col;
     ctx.beginPath(); ctx.arc(cx, cy, TS * 0.32, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
@@ -1469,7 +1477,7 @@
   function drawPad(o) {
     const cx = wx(o.x + 0.5), by = wy(o.y);
     const pink = o.type === 'padPink';
-    const col = pink ? '#ff6fd1' : '#ffe14a';
+    const col = pink ? '#ff6fd1' : o.type === 'padBlue' ? '#4aa8ff' : '#ffe14a';
     ctx.save();
     ctx.shadowColor = col; ctx.shadowBlur = 16;
     ctx.fillStyle = col;
@@ -1477,9 +1485,30 @@
     ctx.ellipse(cx, by, TS * 0.42, TS * (pink ? 0.15 : 0.2), 0, Math.PI, 0);
     ctx.fill();
     ctx.restore();
-    ctx.fillStyle = pink ? 'rgba(255,111,209,0.25)' : 'rgba(255,225,74,0.25)';
+    ctx.fillStyle = pink ? 'rgba(255,111,209,0.25)' : o.type === 'padBlue' ? 'rgba(74,168,255,0.3)' : 'rgba(255,225,74,0.25)';
     const h = (time * 2 % 1) * TS * 0.8;
     ctx.fillRect(cx - TS * 0.3, by - h, TS * 0.6, 3);
+  }
+
+  /** Sägeblatt: dreht sich nur in der Zeichnung. */
+  function drawSaw(o, colors) {
+    const cx = wx(o.x + 0.5), cy = wy(o.y + 0.5), r = TS * 0.46;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(time * 7 + o.x);
+    ctx.fillStyle = '#16161f'; ctx.strokeStyle = mix(colors.accent, 0.4); ctx.lineWidth = 2;
+    ctx.beginPath();
+    const n = 10;
+    for (let i = 0; i < n * 2; i++) {
+      const a = i * Math.PI / n, rr = i % 2 ? r * 0.72 : r;
+      if (i === 0) ctx.moveTo(rr, 0); else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = colors.accent; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.42, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = colors.accent;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   }
 
   const PORTAL_STYLE = {
@@ -1488,6 +1517,7 @@
     miniPortal: ['#ff9b3b', 'Mini'], bigPortal: ['#5ee6ff', 'Gross'],
     ball: ['#ff5a3b', 'Kugel'], ufo: ['#c77dff', 'Ufo'], wave: ['#2fffd0', 'Welle'],
     robot: ['#e8e8ff', 'Roboter'], spider: ['#6f7dff', 'Spinne'], swing: ['#ffb347', 'Schaukel'],
+    teleIn: ['#00d0ff', 'Teleport'], teleOut: ['#ff7a00', 'Ausgang'],
   };
   const SPEED_STYLE = { speed1: ['#ffb03b', 1], speed2: ['#5ee6ff', 2], speed3: ['#7dff9a', 3], speed4: ['#ff5ec8', 4] };
   /** Tempo-Portal: Rahmen mit 1–4 Pfeilen. */
@@ -1906,8 +1936,9 @@
     switch (o.type) {
       case 'block': drawBlock(o, colors); break;
       case 'spike': case 'spikeDown': case 'mini': drawSpike(o, colors); break;
-      case 'orb': case 'gorb': case 'orbPink': drawOrb(o, pulse); break;
-      case 'pad': case 'padPink': drawPad(o); break;
+      case 'orb': case 'gorb': case 'orbPink': case 'orbGreen': case 'orbBlack': drawOrb(o, pulse); break;
+      case 'pad': case 'padPink': case 'padBlue': drawPad(o); break;
+      case 'saw': drawSaw(o, colors); break;
       case 'coin': drawCoin(o); break;
       default: drawPortal(o);
     }

@@ -13,8 +13,13 @@
  *   p  rosa Sprungfeld   r  rosa Ring (beide springen weniger hoch)
  *   1–4 Tempo-Portale (langsam, normal, schnell, sehr schnell)
  *   K  Mini-Portal (halbe Grösse)          N  Normal-Portal (wieder gross)
+ *   Spielmodus-Portale (wirken über die ganze Höhe):
+ *   S Rakete  C Würfel  B Kugel  F Ufo  W Welle  R Roboter  P Spinne  X Schaukel
+ *   g  grüner Ring (Schwerkraft drehen + Sprung)  n  schwarzer Ring (nach unten)
+ *   u  blaues Sprungfeld (Schwerkraft drehen)     z  Sägeblatt (Gefahr)
+ *   T  Teleport-Eingang -> führt zum nächsten t (Ausgang) rechts davon
  *
- * Portale sind 3 Kacheln hoch und werden auf die mittlere Kachel gesetzt.
+ * Andere Portale sind 3 Kacheln hoch und werden auf die mittlere Kachel gesetzt.
  * Nach jeder Änderung prüfen:  node tools/verify-levels.js
  */
 (function (root) {

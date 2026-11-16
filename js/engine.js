@@ -13,6 +13,8 @@
     PAD_V: 28.0,        // Sprungfeld (≈ 4.5 Kacheln hoch)
     ORB_V: 18.4,        // gelber Ring
     BLUE_ORB_V: 8,      // blauer Ring (Schwerkraft-Wechsel)
+    BLUE_PAD_V: 12,     // blaues Sprungfeld (Schwerkraft-Wechsel)
+    BLACK_ORB_V: 24,    // schwarzer Ring: schnell nach unten
     SHIP_UP: 50,        // Rakete: Beschleunigung beim Halten
     SHIP_DOWN: 40,      // Rakete: Beschleunigung beim Loslassen
     SHIP_MAX: 9,        // Rakete: max. vertikale Geschwindigkeit
@@ -69,9 +71,15 @@
     'R': 'robot',
     'P': 'spider',
     'X': 'swing',
+    'g': 'orbGreen',
+    'n': 'orbBlack',
+    'u': 'padBlue',
+    'T': 'teleIn',
+    't': 'teleOut',
+    'z': 'saw',
   };
 
-  const HAZARDS = { spike: 1, spikeDown: 1, mini: 1 };
+  const HAZARDS = { spike: 1, spikeDown: 1, mini: 1, saw: 1 };
   const PORTALS = {
     ship: 1, cube: 1, ball: 1, ufo: 1, wave: 1, robot: 1, spider: 1, swing: 1,
     gravUp: 1, gravDown: 1, speed1: 1, speed2: 1, speed3: 1, speed4: 1, miniPortal: 1, bigPortal: 1,
@@ -89,10 +97,14 @@
       case 'spike': return [x + 0.3, y, x + 0.7, y + 0.55];
       case 'spikeDown': return [x + 0.3, y + 0.45, x + 0.7, y + 1];
       case 'mini': return [x + 0.3, y, x + 0.7, y + 0.3];
+      case 'saw': return [x + 0.15, y + 0.15, x + 0.85, y + 0.85];
       case 'pad':
-      case 'padPink': return [x + 0.05, y, x + 0.95, y + 0.3];
+      case 'padPink':
+      case 'padBlue': return [x + 0.05, y, x + 0.95, y + 0.3];
       case 'orb':
       case 'orbPink':
+      case 'orbGreen':
+      case 'orbBlack':
       case 'gorb': return [x - 0.1, y - 0.1, x + 1.1, y + 1.1];
       case 'coin': return [x + 0.1, y + 0.1, x + 0.9, y + 0.9];
       default: return [x + 0.1, y - 1, x + 0.9, y + 2]; // Portale: 3 Kacheln hoch
@@ -129,6 +141,12 @@
 
     objects.sort((a, b) => a.x - b.x || a.y - b.y);
     objects.forEach((o, i) => { o.id = i; });
+    // Teleport: jeder Eingang führt zum nächsten Ausgang rechts davon (gleiche Spalte zählt)
+    objects.forEach((o) => {
+      if (o.type !== 'teleIn') return;
+      const out = objects.find((q) => q.type === 'teleOut' && q.x >= o.x);
+      if (out) { o.dest = out.y; o.destX = out.x; }
+    });
 
     // Nachbarn von Blöcken merken (für schönere Umrisse beim Zeichnen)
     const blockAt = new Set(objects.filter((o) => o.type === 'block').map((o) => o.x + ',' + o.y));
@@ -365,6 +383,21 @@
         if (!overlap(s.x, s.y, s.x + z, s.y + z, o.hb)) continue;
         if (t === 'coin') {
           if (!s.coins.has(o.id)) { s.coins.add(o.id); s.events.push('coin'); }
+        } else if (t === 'padBlue') {
+          if (!s.used.has(o.id)) {
+            s.used.add(o.id);
+            s.gs = -s.gs;
+            s.vy = -s.gs * C.BLUE_PAD_V;
+            s.onGround = false;
+            s.events.push('pad');
+          }
+        } else if (t === 'teleIn') {
+          if (!s.used.has(o.id) && o.dest !== undefined) {
+            s.used.add(o.id);
+            s.tpFrom = s.y;
+            s.y = Math.max(0, Math.min(C.ROOF - z, o.dest + 0.5 - z / 2));
+            s.events.push('teleport');
+          }
         } else if (t === 'pad' || t === 'padPink') {
           if (!s.used.has(o.id)) {
             s.used.add(o.id);
@@ -372,13 +405,20 @@
             s.onGround = false;
             s.events.push('pad');
           }
-        } else if (t === 'orb' || t === 'orbPink' || t === 'gorb') {
+        } else if (t === 'orb' || t === 'orbPink' || t === 'gorb' || t === 'orbGreen' || t === 'orbBlack') {
           if (!s.used.has(o.id) && s.buffer > 0) {
             s.used.add(o.id);
             s.buffer = 0;
             s.onGround = false;
             if (t === 'orb' || t === 'orbPink') {
               s.vy = s.gs * C.ORB_V * (air ? 0.6 : 1) * (t === 'orbPink' ? C.PINK : 1);
+            } else if (t === 'orbGreen') {
+              // Schwerkraft drehen und in die neue Richtung abspringen
+              s.gs = -s.gs;
+              s.vy = s.gs * C.ORB_V * (air ? 0.6 : 1);
+            } else if (t === 'orbBlack') {
+              // kräftig nach unten (Richtung Schwerkraft)
+              s.vy = -s.gs * C.BLACK_ORB_V;
             } else {
               s.gs = -s.gs;
               s.vy = -s.gs * C.BLUE_ORB_V;

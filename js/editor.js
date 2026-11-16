@@ -38,6 +38,8 @@
     { ch: 'K', name: 'Mini' }, { ch: 'N', name: 'Gross' },
     { ch: 'B', name: 'Kugel' }, { ch: 'F', name: 'Ufo' }, { ch: 'W', name: 'Welle' },
     { ch: 'R', name: 'Roboter' }, { ch: 'P', name: 'Spinne' }, { ch: 'X', name: 'Schaukel' },
+    { ch: 'g', name: 'Grüner Ring' }, { ch: 'n', name: 'Schwarzer Ring' }, { ch: 'u', name: 'Blaues Feld' },
+    { ch: 'T', name: 'Teleport' }, { ch: 't', name: 'Ausgang' }, { ch: 'z', name: 'Säge' },
     { ch: 'fx:color', name: 'Farbe', fx: 'color' }, { ch: 'fx:shake', name: 'Wackeln', fx: 'shake' },
     { ch: 'fx:flash', name: 'Blitz', fx: 'flash' }, { ch: 'fx:pulse', name: 'Puls', fx: 'pulse' },
     { ch: 'fx:zoom', name: 'Zoom', fx: 'zoom' },
@@ -337,6 +339,17 @@
       case 'b': circle(6, '#4aa8ff'); circle(11, null, '#4aa8ff'); break;
       case 'c': circle(10, '#ffd84a', '#b88a00'); break;
       case 'S': portal('#ff5ec8'); break;
+      case 'g': circle(6, '#5dff6a'); circle(11, null, '#5dff6a'); break;
+      case 'n': circle(7, '#111118'); circle(11, null, '#ffffff'); break;
+      case 'u': c.beginPath(); c.ellipse(16, 26, 11, 6, 0, Math.PI, 0); c.fillStyle = '#4aa8ff'; c.fill(); c.strokeStyle = ink; c.lineWidth = 2; c.stroke(); break;
+      case 'T': portal('#00d0ff'); c.fillStyle = ink; c.font = 'bold 12px sans-serif'; c.textAlign = 'center'; c.fillText('→', 16, 20); break;
+      case 't': portal('#ff7a00'); c.fillStyle = ink; c.font = 'bold 12px sans-serif'; c.textAlign = 'center'; c.fillText('●', 16, 20); break;
+      case 'z': {
+        c.beginPath();
+        for (let i = 0; i < 20; i++) { const a = i * Math.PI / 10, rr = i % 2 ? 9 : 13; c.lineTo(16 + Math.cos(a) * rr, 16 + Math.sin(a) * rr); }
+        c.closePath(); c.fillStyle = ink; c.fill(); c.strokeStyle = '#7fd3ff'; c.lineWidth = 2; c.stroke();
+        break;
+      }
       case 'B': case 'F': case 'W': case 'R': case 'P': case 'X': {
         const look = { B: ['#ff5a3b', 'K'], F: ['#c77dff', 'U'], W: ['#2fffd0', 'W'], R: ['#c9c9ff', 'R'], P: ['#6f7dff', 'S'], X: ['#ffb347', 'S'] }[t.ch];
         portal(look[0]);
@@ -690,6 +703,14 @@
     // Objekte und Ziel
     G.drawObjects(parsed, colors, 0.5);
     G.drawEnd(colors);
+    // Teleport: gestrichelte Linie vom Eingang zum Ausgang
+    parsed.objects.forEach((o) => {
+      if (o.type !== 'teleIn' || o.destX === undefined || o.destX < left - 2 || o.x > right + 2) return;
+      ctx.save();
+      ctx.setLineDash([6, 6]); ctx.strokeStyle = '#00d0ff'; ctx.globalAlpha = 0.7; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(G.wx(o.x + 0.5), G.wy(o.y + 0.5)); ctx.lineTo(G.wx(o.destX + 0.5), G.wy(o.dest + 0.5)); ctx.stroke();
+      ctx.restore();
+    });
     // Effekt-Trigger: Abzeichen + gestrichelte Linie, ab der sie auslösen
     (cur.extras || []).forEach((e) => {
       if (e.x < left - 1 || e.x > right + 1) return;
