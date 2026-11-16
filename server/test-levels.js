@@ -135,7 +135,7 @@ async function suite(label, store) {
     ok(r.status === 400 && r.json.error === 'author', 'Link als Spielername -> abgelehnt');
     r = await pub(Object.assign({}, base, { rows: COINS.slice(0, 9), replay: { h0: false, t: [] } }));
     ok(r.status === 400 && r.json.error === 'format', '9 Zeilen -> ungültig');
-    r = await pub(Object.assign({}, base, { rows: COINS.map((x, i) => (i === 0 ? 'X' + x.slice(1) : x)), replay: { h0: false, t: [] } }));
+    r = await pub(Object.assign({}, base, { rows: COINS.map((x, i) => (i === 0 ? '?' + x.slice(1) : x)), replay: { h0: false, t: [] } }));
     ok(r.status === 400 && r.json.error === 'format', 'unbekanntes Zeichen -> ungültig');
     r = await pub(Object.assign({}, base, { rows: rowsWith(40, [['c', 10, 3]]), replay: { h0: false, t: [] } }));
     ok(r.status === 400 && r.json.error === 'small', 'nur 1 Objekt -> zu klein');
