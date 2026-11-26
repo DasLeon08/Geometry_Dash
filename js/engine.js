@@ -486,6 +486,11 @@
    *   pulse: Puls im Takt (power 1–3, dur s)   zoom: Heranzoomen (zoom 1–1.3, dur s)
    *   tilt: Kamera neigen (angle −15…15 Grad, dur s)   mirror: Bild spiegeln (on 0/1, dur s)
    *   dark: Dunkel mit Licht um die Spielfigur (power 0–1, 0 = wieder hell; dur s)
+   *   shock: Schockwelle (power 1–3)   chroma: Farbversatz (power, dur)
+   *   glitch: Bildstörung (power, dur)   blur: Zoom-Unschärfe (power, dur)
+   *   camera: Kamera hoch/runter (y −3…3 Kacheln, dur s)
+   *   area: Einflug der Objekte ab hier (style 0 aus, 1 von unten, 2 von oben, 3 Zoom, 4 Drehen, 5 Einblenden)
+   *   bg: Hintergrund (style 0–5) und Boden (ground 0–3)   particles: Umgebung (kind 0 aus, 1 Funken, 2 Schnee, 3 Blasen)
    */
   const FX = {
     color: { theme: [0, 29, 0, true], fade: [0, 3, 1] },
@@ -496,6 +501,14 @@
     tilt: { angle: [-15, 15, 8, true], dur: [0, 3, 1] },
     mirror: { on: [0, 1, 1, true], dur: [0, 2, 0.6] },
     dark: { power: [0, 1, 0.75], dur: [0, 3, 1] },
+    shock: { power: [1, 3, 2, true] },
+    chroma: { power: [1, 3, 2, true], dur: [0.1, 3, 0.6] },
+    glitch: { power: [1, 3, 2, true], dur: [0.1, 3, 0.5] },
+    blur: { power: [1, 3, 2, true], dur: [0.1, 3, 0.8] },
+    camera: { y: [-3, 3, 1], dur: [0, 3, 1] },
+    area: { style: [0, 5, 1, true] },
+    bg: { style: [0, 5, 1, true], ground: [0, 3, 0, true] },
+    particles: { kind: [0, 3, 1, true] },
   };
   const MAX_EXTRAS = 200;
   function fxDefaults(t) {

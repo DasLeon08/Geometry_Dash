@@ -1111,6 +1111,7 @@
   }
 
   function startPrepared(practice) {
+    if (!game.level.deco) game.level.deco = buildDeco(game.level);
     setTheme(game.level.def);
     game.practice = practice;
     game.checkpoints = [];
@@ -1331,7 +1332,10 @@
   // Effekt-Trigger aus eigenen Leveln (nur Optik)
   // ---------------------------------------------------------------------
   const FLASH_COLORS = ['255,255,255', '255,224,102', '94,230,255', '255,94,200', '125,255,154', '255,90,90'];
-  const fx = { list: [], next: 0, base: null, color: null, pulseUntil: 0, pulsePower: 0, zoom: null, flashRgb: FLASH_COLORS[0], flashDecay: 2, shakePower: 1 };
+  const fx = {
+    list: [], next: 0, base: null, color: null, pulseUntil: 0, pulsePower: 0, zoom: null, flashRgb: FLASH_COLORS[0], flashDecay: 2, shakePower: 1,
+    shocks: [], area: 0, bgStyle: 0, groundStyle: 0, partKind: 0, bgFade: -9,
+  };
 
   /** Beim (Neu-)Start: Trigger vor der Startposition gelten als schon passiert (nur Farbe zählt). */
   function fxReset(startX) {
@@ -1340,8 +1344,12 @@
     fx.next = 0;
     fx.base = def.colors;
     fx.color = null; fx.zoom = null; fx.pulseUntil = 0;
-    fx.tilt = null; fx.mirror = null; fx.dark = null;
+    fx.tilt = null; fx.mirror = null; fx.dark = null; fx.cam = null;
     fx.flashRgb = FLASH_COLORS[0]; fx.flashDecay = 2; fx.shakePower = 1;
+    fx.shocks = []; fx.chroma = null; fx.glitch = null; fx.blur = null;
+    // Grundstimmung des Levels (eingebaute Level setzen def.look)
+    const look = def.look || {};
+    fx.area = look.area || 0; fx.bgStyle = look.bg || 0; fx.groundStyle = look.ground || 0; fx.partKind = look.particles || 0;
     // Trigger vor dem Start: bleibende Zustände sofort übernehmen
     const still = (v) => ({ from: v, to: v, t0: 0, dur: 0 });
     while (fx.next < fx.list.length && fx.list[fx.next].x < startX) {
@@ -1351,6 +1359,10 @@
       else if (e.t === 'tilt') fx.tilt = still(save.fxReduced ? 0 : p.angle);
       else if (e.t === 'mirror') fx.mirror = still(p.on ? -1 : 1);
       else if (e.t === 'dark') fx.dark = still(p.power);
+      else if (e.t === 'camera') fx.cam = still(p.y);
+      else if (e.t === 'area') fx.area = p.style;
+      else if (e.t === 'bg') { fx.bgStyle = p.style; fx.groundStyle = p.ground; }
+      else if (e.t === 'particles') fx.partKind = p.kind;
     }
   }
   function fxUpdate(x) {
@@ -1367,6 +1379,19 @@
     else if (e.t === 'tilt') fx.tilt = { from: fxTilt(), to: soft ? 0 : p.angle, t0: time, dur: p.dur };
     else if (e.t === 'mirror') fx.mirror = { from: fxMirror(), to: p.on ? -1 : 1, t0: time, dur: soft ? 0 : p.dur };
     else if (e.t === 'dark') fx.dark = { from: fxDark(), to: p.power, t0: time, dur: p.dur };
+    else if (e.t === 'camera') fx.cam = { from: fxCam(), to: p.y, t0: time, dur: p.dur };
+    else if (e.t === 'area') fx.area = p.style;
+    else if (e.t === 'bg') { fx.bgStyle = p.style; fx.groundStyle = p.ground; fx.bgFade = time; }
+    else if (e.t === 'particles') fx.partKind = p.kind;
+    else if (e.t === 'shock') { fx.shocks.push({ t0: time, power: p.power }); if (!soft) game.flash = Math.max(game.flash, 0.15 * p.power); }
+    else if (!soft && (e.t === 'chroma' || e.t === 'glitch' || e.t === 'blur')) fx[e.t] = { t0: time, until: time + p.dur, power: p.power };
+  }
+  function fxCam() { return animVal(fx.cam, 0); }
+  /** Stärke eines Bild-Effekts (0…1), klingt zum Ende hin ab. */
+  function fxAmount(a) {
+    if (!a || time >= a.until) return 0;
+    const k = (a.until - time) / Math.max(0.05, a.until - a.t0);
+    return Math.min(1, k * 1.5) * a.power / 3;
   }
   function themeColors(i) { return (window.LEVELS[i] || window.LEVELS[0]).colors; }
   /** Wert eines laufenden Übergangs, sanft an- und auslaufend. */
@@ -1454,6 +1479,100 @@
     }
   }
 
+  // ----- Schockwellen und Bild-Effekte (nur Optik) --------------------------
+  function drawShocks() {
+    fx.shocks = fx.shocks.filter((sh) => time - sh.t0 < 0.8);
+    for (const sh of fx.shocks) {
+      const a = (time - sh.t0) / 0.8, r = TS * (1 + a * (6 + sh.power * 3));
+      ctx.save();
+      ctx.globalAlpha = (1 - a) * 0.8;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = (1 - a) * 18 + 2;
+      ctx.beginPath(); ctx.arc(game.lightX, game.lightY, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = (1 - a) * 0.35;
+      ctx.lineWidth = (1 - a) * 40;
+      ctx.strokeStyle = fxColors().accent;
+      ctx.beginPath(); ctx.arc(game.lightX, game.lightY, r * 0.85, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+  }
+  // Zwischenspeicher für die Bild-Effekte (gleich gross wie das Spielbild)
+  const bufs = [];
+  function buf(i) {
+    if (!bufs[i]) bufs[i] = document.createElement('canvas');
+    const b = bufs[i];
+    if (b.width !== canvas.width || b.height !== canvas.height) { b.width = canvas.width; b.height = canvas.height; }
+    return b;
+  }
+  function postFx() {
+    if (save.fxReduced) return;
+    const ch = fxAmount(fx.chroma), gl = fxAmount(fx.glitch), bl = fxAmount(fx.blur);
+    if (!ch && !gl && !bl) return;
+    const W = canvas.width, H = canvas.height;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const src = buf(0), sc = src.getContext('2d');
+    sc.globalCompositeOperation = 'copy';
+    sc.drawImage(canvas, 0, 0);
+    if (bl) {
+      // radiale Zoom-Unschärfe um die Spielfigur
+      const cx = game.lightX * scale, cy = game.lightY * scale;
+      for (let k = 1; k <= 4; k++) {
+        const z = 1 + k * 0.018 * bl * 3;
+        ctx.globalAlpha = 0.22;
+        ctx.drawImage(src, cx - cx * z, cy - cy * z, W * z, H * z);
+      }
+      ctx.globalAlpha = 1;
+      sc.drawImage(canvas, 0, 0);
+    }
+    if (ch) {
+      // Farbversatz: Rot nach rechts, Blau nach links, Grün bleibt
+      const d = Math.round(ch * 14 * (scale / 2 + 0.5));
+      const r = buf(1), rc = r.getContext('2d'), b = buf(2), bc = b.getContext('2d');
+      rc.globalCompositeOperation = 'copy'; rc.drawImage(src, 0, 0);
+      rc.globalCompositeOperation = 'multiply'; rc.fillStyle = '#ff0000'; rc.fillRect(0, 0, W, H);
+      bc.globalCompositeOperation = 'copy'; bc.drawImage(src, 0, 0);
+      bc.globalCompositeOperation = 'multiply'; bc.fillStyle = '#0000ff'; bc.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = '#00ff00'; ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter';
+      // verschoben einsetzen; die frei gewordenen Ränder mit dem unverschobenen Rand füllen
+      ctx.drawImage(r, 0, 0, W - d, H, d, 0, W - d, H);
+      ctx.drawImage(r, 0, 0, d, H, 0, 0, d, H);
+      ctx.drawImage(b, d, 0, W - d, H, 0, 0, W - d, H);
+      ctx.drawImage(b, W - d, 0, d, H, W - d, 0, d, H);
+      ctx.globalCompositeOperation = 'source-over';
+      if (gl) sc.drawImage(canvas, 0, 0);
+    }
+    if (gl) {
+      // Bildstörung: Streifen seitlich versetzen, ab und zu ein farbiger Balken
+      const n = 4 + Math.round(gl * 6);
+      for (let k = 0; k < n; k++) {
+        const y = Math.floor(Math.random() * H), h = Math.floor(H * (0.02 + Math.random() * 0.08));
+        const dx = Math.round((Math.random() - 0.5) * W * 0.08 * gl);
+        ctx.drawImage(src, 0, y, W, h, dx, y, W, h);
+      }
+      if (Math.random() < gl * 0.5) {
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = Math.random() < 0.5 ? '#ff2bd6' : '#2bf0ff';
+        ctx.fillRect(0, Math.random() * H, W, H * 0.015);
+        ctx.globalAlpha = 1;
+      }
+    }
+    ctx.restore();
+  }
+  /** Umgebungspartikel (Trigger particles): Funken, Schnee, Blasen. */
+  function spawnAmbient(dt) {
+    const kind = fx.partKind;
+    if (!kind || !game.state) return;
+    const rate = (save.fxReduced ? 6 : 14) * dt;
+    if (Math.random() > rate) return;
+    const x = camX + Math.random() * (viewW / TS + 6);
+    const col = fxColors().accent;
+    if (kind === 1) particles.push({ x, y: 0.2, vx: -1 - Math.random() * 2, vy: 4 + Math.random() * 5, life: 1.2, max: 1.2, size: 0.06 + Math.random() * 0.06, color: col, square: false, glow: true, float: true });
+    else if (kind === 2) particles.push({ x, y: C.ROOF + 0.5, vx: -1.5 - Math.random(), vy: -1.5 - Math.random() * 1.5, life: 5, max: 5, size: 0.05 + Math.random() * 0.06, color: 'rgba(255,255,255,0.85)', square: false, float: true });
+    else if (kind === 3) particles.push({ x, y: 0, vx: -0.5, vy: 1.5 + Math.random() * 2, life: 4, max: 4, size: 0.08 + Math.random() * 0.1, color: col, ring2: true, float: true, ph: Math.random() * 6 });
+  }
+
   function updateParticles(dt) {
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
@@ -1464,6 +1583,8 @@
       } else if (p.conf) {
         p.x += (p.vx + Math.sin(time * 4 + p.ph) * 0.8) * dt; p.y += p.vy * dt;
         p.rot += p.spin * dt;
+      } else if (p.float) {
+        p.x += (p.vx + (p.ring2 ? Math.sin(time * 3 + p.ph) * 0.6 : 0)) * dt; p.y += p.vy * dt;
       } else if (!p.ring) {
         p.x += p.vx * dt; p.y += p.vy * dt;
         p.vx *= 1 - dt * 1.5; p.vy -= (p.heavy ? 22 : 6) * dt;
@@ -1488,7 +1609,8 @@
     return 'rgb(' + r + ',' + g + ',' + b + ')';
   }
 
-  function drawBackground(colors, pulse) {
+  function drawBackground(colors, pulse, style) {
+    style = style || 0;
     const g = ctx.createLinearGradient(0, 0, 0, viewH);
     g.addColorStop(0, colors.bgTop);
     g.addColorStop(1, colors.bgBottom);
@@ -1505,26 +1627,100 @@
       ctx.beginPath(); ctx.arc(x, st.y + viewH / 2 - 270, st.r, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
-    // nahe Ebene: Quadrate, die im Takt etwas grösser werden
+    // nahe Ebene: Formen je nach Stil, die im Takt etwas grösser werden
     ctx.save();
     ctx.globalAlpha = 0.08 + pulse * 0.05;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
     const grow = 1 + Math.min(pulse, 2) * 0.06;
-    for (const b of bgShapes) {
-      const span = 2400;
-      let x = ((b.x - camX * TS * b.d) % span + span) % span - 200;
-      ctx.save();
-      ctx.translate(x, b.y + viewH / 2 - 270);
-      ctx.rotate(b.r + time * 0.05);
-      const sz = b.s * grow;
-      ctx.strokeRect(-sz / 2, -sz / 2, sz, sz);
-      ctx.restore();
+    if (style === 3) drawBgGrid(pulse);
+    else if (style === 5) drawBgTunnel(pulse);
+    else {
+      for (const b of bgShapes) {
+        const span = 2400;
+        const x = ((b.x - camX * TS * b.d) % span + span) % span - 200;
+        if (x < -200 || x > viewW + 200) continue;
+        ctx.save();
+        ctx.translate(x, b.y + viewH / 2 - 270);
+        ctx.rotate(b.r + time * 0.05);
+        const sz = b.s * grow;
+        ctx.beginPath();
+        if (style === 1) { ctx.arc(0, 0, sz / 2, 0, Math.PI * 2); ctx.moveTo(sz * 0.3, 0); ctx.arc(0, 0, sz * 0.3, 0, Math.PI * 2); }
+        else if (style === 2) { ctx.moveTo(0, -sz / 2); ctx.lineTo(sz * 0.45, sz * 0.3); ctx.lineTo(-sz * 0.45, sz * 0.3); ctx.closePath(); }
+        else if (style === 4) { for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; ctx.lineTo(Math.cos(a) * sz / 2, Math.sin(a) * sz / 2); } ctx.closePath(); }
+        else ctx.rect(-sz / 2, -sz / 2, sz, sz);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+    if (style) drawMidground(colors, style, pulse);
+  }
+  /** Leuchtendes Gitter, das zum Horizont zusammenläuft. */
+  function drawBgGrid(pulse) {
+    const hy = groundY - TS * 6, off = ((camX * TS * 0.5) % 80 + 80) % 80;
+    ctx.beginPath();
+    for (let x = -off - 800; x < viewW + 800; x += 80) { ctx.moveTo(viewW / 2 + (x - viewW / 2) * 0.3, hy - 120); ctx.lineTo(x, groundY); }
+    for (let k = 0; k < 8; k++) { const y = hy - 120 + Math.pow(k / 8, 1.8) * (groundY - hy + 120); ctx.moveTo(0, y); ctx.lineTo(viewW, y); }
+    ctx.globalAlpha = 0.1 + pulse * 0.06;
+    ctx.stroke();
+  }
+  /** Sternentunnel: Strahlen aus der Bildmitte, die sich drehen. */
+  function drawBgTunnel(pulse) {
+    const cx = viewW * 0.62, cy = viewH * 0.4, n = 24;
+    ctx.beginPath();
+    for (let k = 0; k < n; k++) {
+      const a = k * Math.PI * 2 / n + time * 0.15;
+      ctx.moveTo(cx + Math.cos(a) * 60, cy + Math.sin(a) * 60);
+      ctx.lineTo(cx + Math.cos(a) * viewW, cy + Math.sin(a) * viewW);
+    }
+    for (let r = ((time * 120) % 140) + 60; r < viewW; r += 140) { ctx.moveTo(cx + r, cy); ctx.arc(cx, cy, r, 0, Math.PI * 2); }
+    ctx.globalAlpha = 0.07 + pulse * 0.05;
+    ctx.stroke();
+  }
+  /** Mittelebene: Silhouetten (Türme oder Hügel), die langsamer als der Boden scrollen. */
+  const midShapes = [];
+  (function () {
+    let seed = 99;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < 30; i++) midShapes.push({ x: i * 80 + rnd() * 40, w: 40 + rnd() * 50, h: 60 + rnd() * 180, t: rnd() });
+  })();
+  function drawMidground(colors, style, pulse) {
+    ctx.save();
+    ctx.fillStyle = colors.ground;
+    ctx.globalAlpha = 0.55;
+    const span = 2400, base = groundY;
+    if (style === 1 || style === 2 || style === 5) {
+      // Hügel als Wellenlinie
+      ctx.beginPath();
+      ctx.moveTo(0, base);
+      for (let x = 0; x <= viewW + 20; x += 20) {
+        const u = (x + camX * TS * 0.35) / 160;
+        ctx.lineTo(x, base - 70 - Math.sin(u) * 40 - Math.sin(u * 0.37 + 1) * 50);
+      }
+      ctx.lineTo(viewW, base); ctx.closePath(); ctx.fill();
+    } else {
+      for (const m of midShapes) {
+        const x = ((m.x - camX * TS * 0.35) % span + span) % span - 100;
+        if (x < -120 || x > viewW + 20) continue;
+        ctx.fillRect(x, base - m.h, m.w, m.h);
+        if (m.t > 0.5) ctx.fillRect(x + m.w * 0.35, base - m.h - 30, m.w * 0.3, 30);
+      }
+    }
+    // Lichter auf den Silhouetten im Takt
+    ctx.globalAlpha = 0.25 + pulse * 0.25;
+    ctx.fillStyle = colors.accent;
+    for (const m of midShapes) {
+      const x = ((m.x - camX * TS * 0.35) % span + span) % span - 100;
+      if (x < -120 || x > viewW + 20 || m.t < 0.3) continue;
+      const y = style === 1 || style === 2 || style === 5 ? base - 60 : base - m.h + 12;
+      ctx.fillRect(x + m.w / 2 - 3, y, 6, 6);
     }
     ctx.restore();
   }
 
-  function drawGround(colors, pulse) {
+  function drawGround(colors, pulse, style) {
+    style = style || 0;
     const glow = 14 + Math.min(pulse || 0, 2) * 12;
     ctx.fillStyle = colors.ground;
     ctx.fillRect(0, groundY, viewW, viewH - groundY);
@@ -1536,9 +1732,21 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.lineWidth = 2;
     const off = ((-camX * TS) % (TS * 4) + TS * 4) % (TS * 4);
-    for (let x = off - TS * 4; x < viewW; x += TS * 4) {
-      ctx.beginPath(); ctx.moveTo(x, groundY); ctx.lineTo(x, viewH); ctx.stroke();
+    ctx.beginPath();
+    if (style === 1) {
+      // schräge Streifen
+      for (let x = off - TS * 8; x < viewW + TS * 4; x += TS * 2) { ctx.moveTo(x, groundY); ctx.lineTo(x - TS * 2, viewH); }
+    } else if (style === 2) {
+      // Leuchtgitter
+      ctx.strokeStyle = colors.accent;
+      ctx.globalAlpha = 0.25 + (pulse || 0) * 0.1;
+      for (let x = off - TS * 4; x < viewW; x += TS * 2) { ctx.moveTo(x, groundY); ctx.lineTo(x, viewH); }
+      for (let y = groundY + TS; y < viewH; y += TS) { ctx.moveTo(0, y); ctx.lineTo(viewW, y); }
+    } else if (style === 0) {
+      for (let x = off - TS * 4; x < viewW; x += TS * 4) { ctx.moveTo(x, groundY); ctx.lineTo(x, viewH); }
     }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
     ctx.fillStyle = colors.accent;
     ctx.shadowColor = colors.accent; ctx.shadowBlur = glow;
     ctx.fillRect(0, groundY - 1, viewW, 3);
@@ -1558,12 +1766,18 @@
     }
   }
 
-  function drawBlock(o, colors) {
+  function drawBlock(o, colors, pulse) {
     const x = wx(o.x), y = wy(o.y + 1);
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(x, y, TS, TS);
     ctx.fillStyle = 'rgba(255,255,255,0.06)';
     ctx.fillRect(x + 6, y + 6, TS - 12, TS - 12);
+    if (pulse > 0.05 && !save.fxReduced) {
+      ctx.globalAlpha = 0.14 * pulse;
+      ctx.fillStyle = colors.accent;
+      ctx.fillRect(x + 6, y + 6, TS - 12, TS - 12);
+      ctx.globalAlpha = 1;
+    }
     ctx.strokeStyle = colors.accent;
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -2023,6 +2237,9 @@
         g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, p.color); g.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = g;
         ctx.fillRect(wx(p.x) - w, top, w * 2, bot - top);
+      } else if (p.ring2) {
+        ctx.strokeStyle = p.color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(wx(p.x), wy(p.y), p.size * TS, 0, Math.PI * 2); ctx.stroke();
       } else if (p.ring) {
         ctx.strokeStyle = p.color;
         ctx.lineWidth = p.big ? 5 * a + 1 : 3;
@@ -2152,16 +2369,70 @@
   }
 
   /** Alle sichtbaren Objekte eines Levels zeichnen. */
-  function drawObjects(level, colors, pulse) {
+  function drawObjects(level, colors, pulse, area) {
     const objs = level.objects;
     const left = camX - 3, right = camX + viewW / TS + 3;
+    if (level.deco) drawDeco(level, colors, left, right);
     let lo = 0, hi = objs.length;
     while (lo < hi) { const mid = (lo + hi) >> 1; if (objs[mid].x < left) lo = mid + 1; else hi = mid; }
-    for (let i = lo; i < objs.length && objs[i].x <= right; i++) drawObject(objs[i], colors, pulse);
+    for (let i = lo; i < objs.length && objs[i].x <= right; i++) {
+      const o = objs[i];
+      const k = area ? areaK(o) : 0;
+      if (k <= 0) { drawObject(o, colors, pulse); continue; }
+      if (k >= 1) continue;
+      // Einflug: Versatz, Grösse, Drehung und Deckkraft aus dem Abstand zur Bildmitte
+      const cx = wx(o.x + 0.5), cy = wy(o.y + 0.5), e = k * k;
+      ctx.save();
+      if (area === 1) ctx.translate(0, e * TS * 7);
+      else if (area === 2) ctx.translate(0, -e * TS * 7);
+      else if (area === 3 || area === 4) {
+        ctx.translate(cx, cy);
+        if (area === 4) ctx.rotate(e * Math.PI * 1.5);
+        const sc = Math.max(0.05, 1 - e);
+        ctx.scale(sc, sc);
+        ctx.translate(-cx, -cy);
+      }
+      ctx.globalAlpha = area === 5 ? 1 - k : 1 - e * 0.7;
+      drawObject(o, colors, pulse);
+      ctx.restore();
+    }
+  }
+  /** 0 = an seinem Platz, 1 = noch ganz draussen. Fertig ab 55 % der Bildbreite. */
+  function areaK(o) {
+    const sx = wx(o.x + 0.5), a = viewW * 0.55, b = viewW + TS;
+    return sx <= a ? 0 : Math.min(1, (sx - a) / (b - a));
+  }
+  /** Deko ohne Hitbox: Ketten unter schwebenden Blöcken. */
+  function buildDeco(level) {
+    const solid = new Set();
+    level.objects.forEach((o) => { if (o.type !== 'coin') solid.add(o.x + ',' + o.y); });
+    const deco = [];
+    level.objects.forEach((o) => {
+      if (o.type !== 'block' || o.y < 2 || o.n.down) return;
+      let y = o.y - 1;
+      while (y >= 0 && !solid.has(o.x + ',' + y)) y--;
+      if (y < 0 && (o.x % 2 === 0 || !o.n.left || !o.n.right)) deco.push({ x: o.x, top: o.y });
+    });
+    return deco;
+  }
+  function drawDeco(level, colors, left, right) {
+    ctx.save();
+    ctx.strokeStyle = colors.accent;
+    ctx.globalAlpha = 0.28;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    for (const d of level.deco) {
+      if (d.x < left || d.x > right) continue;
+      const x = wx(d.x + 0.5);
+      ctx.moveTo(x, wy(d.top)); ctx.lineTo(x, groundY);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
   function drawObject(o, colors, pulse) {
     switch (o.type) {
-      case 'block': drawBlock(o, colors); break;
+      case 'block': drawBlock(o, colors, pulse); break;
       case 'spike': case 'spikeDown': case 'mini': drawSpike(o, colors); break;
       case 'orb': case 'gorb': case 'orbPink': case 'orbGreen': case 'orbBlack': drawOrb(o, pulse); break;
       case 'pad': case 'padPink': case 'padBlue': drawPad(o); break;
@@ -2217,31 +2488,38 @@
       ctx.translate(-viewW / 2, -viewH / 2);
     }
     const pulsing = time < fx.pulseUntil ? fx.pulsePower : 0;
-    drawBackground(playColors, pulse * pulse * (1 + pulsing * 1.5));
-    // Zoom (Trigger) und Puls im Takt: um die Spielfigur herum vergrössern
-    const zoom = fxZoom() * (1 + pulsing * 0.012 * pulse * pulse);
+    drawBackground(playColors, pulse * pulse * (1 + pulsing * 1.5), fx.bgStyle);
+    // Zoom (Trigger), Puls im Takt und Schockwellen: um die Spielfigur herum vergrössern
+    let kick = 0;
+    if (!save.fxReduced) fx.shocks.forEach((sh) => { const a = (time - sh.t0) / 0.5; if (a < 1) kick += (1 - a) * (1 - a) * 0.03 * sh.power; });
+    const zoom = fxZoom() * (1 + pulsing * 0.012 * pulse * pulse) * (1 + kick);
     if (zoom !== 1) {
       const zx = PLAYER_SCREEN_X * TS, zy = groundY - 4 * TS;
       ctx.translate(zx, zy); ctx.scale(zoom, zoom); ctx.translate(-zx, -zy);
     }
+    // Kamera-Versatz (Trigger): positive Werte zeigen mehr vom Himmel
+    const camY = fxCam();
+    if (camY) ctx.translate(0, camY * TS);
     drawAttemptText();
-    drawGround(playColors, save.fxReduced ? 0 : pulse * pulse * (1 + pulsing));
+    drawGround(playColors, save.fxReduced ? 0 : pulse * pulse * (1 + pulsing), fx.groundStyle);
 
-    drawObjects(game.level, playColors, pulsing ? Math.min(1, pulse * (1 + pulsing * 0.5)) : pulse);
+    drawObjects(game.level, playColors, pulsing ? Math.min(1, pulse * (1 + pulsing * 0.5)) : pulse, fx.area);
     drawEnd(playColors);
     drawCheckpoints();
     drawParticles();
     drawGhosts();
     drawTrail();
     drawPlayer();
-    // Bildschirm-Position der Spielfigur für das Licht im Dunkeln
-    const dark = fxDark();
-    if (dark > 0.01) {
+    // Bildschirm-Position der Spielfigur (Licht im Dunkeln, Schockwellen)
+    {
       const m = ctx.getTransform();
       const pt = m.transformPoint(new DOMPoint(wx(s.x + s.size / 2), wy(s.y + s.size / 2)));
       game.lightX = pt.x / scale; game.lightY = pt.y / scale;
     }
+    const dark = fxDark();
     ctx.restore();
+    drawShocks();
+    postFx();
     if (dark > 0.01) {
       const g = ctx.createRadialGradient(game.lightX, game.lightY, TS * 1.1, game.lightX, game.lightY, TS * 5.5);
       g.addColorStop(0, 'rgba(0,0,0,0)');
@@ -2306,6 +2584,7 @@
     }
     // kurze Zeitlupe direkt nach dem Ziel
     const slow = game.scene === 'win' && game.winTimer > 0.7 && !save.fxReduced ? 0.35 : 1;
+    if (game.scene === 'play' && !game.paused) spawnAmbient(dt);
     if (!game.paused) updateParticles(dt * slow);
     game.goFlash = Math.max(0, (game.goFlash || 0) - dt);
     if (game.race) mpSendState(now);

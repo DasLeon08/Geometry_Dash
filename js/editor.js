@@ -45,6 +45,10 @@
     { ch: 'fx:zoom', name: 'Zoom', fx: 'zoom' },
     { ch: 'fx:tilt', name: 'Neigen', fx: 'tilt' }, { ch: 'fx:mirror', name: 'Spiegeln', fx: 'mirror' },
     { ch: 'fx:dark', name: 'Dunkel', fx: 'dark' },
+    { ch: 'fx:shock', name: 'Schockwelle', fx: 'shock' }, { ch: 'fx:chroma', name: 'Farbversatz', fx: 'chroma' },
+    { ch: 'fx:glitch', name: 'Glitch', fx: 'glitch' }, { ch: 'fx:blur', name: 'Unschärfe', fx: 'blur' },
+    { ch: 'fx:camera', name: 'Kamera', fx: 'camera' }, { ch: 'fx:area', name: 'Einflug', fx: 'area' },
+    { ch: 'fx:bg', name: 'Hintergrund', fx: 'bg' }, { ch: 'fx:particles', name: 'Partikel', fx: 'particles' },
     { ch: '.', name: 'Radierer', erase: true }, { ch: 'hand', name: 'Hand', hand: true },
   ];
   const FX_LOOK = {
@@ -56,9 +60,17 @@
     tilt: { col: '#7dff9a', sym: '⟋', title: 'Neigen', hint: 'Neigt die Kamera (0 = gerade).' },
     mirror: { col: '#ffffff', sym: '⇋', title: 'Spiegeln', hint: 'Spiegelt das Bild links/rechts (1 = an, 0 = aus).' },
     dark: { col: '#5a4a8a', sym: '●', title: 'Dunkel', hint: 'Macht es dunkel, nur um die Spielfigur bleibt Licht (0 = wieder hell).' },
+    shock: { col: '#ffffff', sym: '◌', title: 'Schockwelle', hint: 'Ein Ring breitet sich von der Spielfigur aus, das Bild zuckt kurz.' },
+    chroma: { col: '#ff4fd8', sym: '▥', title: 'Farbversatz', hint: 'Rot und Blau verschieben sich kurz gegeneinander.' },
+    glitch: { col: '#2bf0ff', sym: '▤', title: 'Glitch', hint: 'Streifen des Bildes springen kurz zur Seite.' },
+    blur: { col: '#b6c8ff', sym: '◍', title: 'Unschärfe', hint: 'Das Bild verschwimmt kurz nach aussen.' },
+    camera: { col: '#ffd84a', sym: '↕', title: 'Kamera', hint: 'Schiebt die Kamera hoch (+) oder runter (−), 0 = normal.' },
+    area: { col: '#7dffea', sym: '⇱', title: 'Einflug', hint: 'Wie Objekte ab hier ins Bild kommen: 0 normal, 1 von unten, 2 von oben, 3 Zoom, 4 Drehen, 5 Einblenden.' },
+    bg: { col: '#9d7dff', sym: '▦', title: 'Hintergrund', hint: 'Hintergrund 0 Quadrate, 1 Ringe, 2 Dreiecke, 3 Gitter, 4 Waben, 5 Tunnel. Boden 0 Kacheln, 1 Streifen, 2 Gitter, 3 glatt.' },
+    particles: { col: '#ffb347', sym: '∴', title: 'Partikel', hint: 'Umgebung: 0 aus, 1 Funken, 2 Schnee, 3 Blasen.' },
   };
   const FLASH_SWATCHES = ['#ffffff', '#ffe066', '#5ee6ff', '#ff5ec8', '#7dff9a', '#ff5a5a'];
-  const FX_LABELS = { fade: 'Übergang (s)', power: 'Stärke', dur: 'Dauer (s)', zoom: 'Zoom', angle: 'Winkel (°)', on: 'An (1) / Aus (0)' };
+  const FX_LABELS = { fade: 'Übergang (s)', power: 'Stärke', dur: 'Dauer (s)', zoom: 'Zoom', angle: 'Winkel (°)', on: 'An (1) / Aus (0)', y: 'Höhe (Kacheln)', style: 'Stil', ground: 'Boden', kind: 'Art' };
 
   // ---------------------------------------------------------------------
   // Entwürfe speichern und laden (alles wird geprüft, es kommt aus dem Speicher)
