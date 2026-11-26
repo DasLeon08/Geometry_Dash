@@ -39,12 +39,14 @@
   // ---------------------------------------------------------------------
   // Speicherstand (nur im Browser des Spielers)
   // ---------------------------------------------------------------------
+  const SAVE_VER = 2;        // bei grossen Level-Umbauten erhöhen: setzt den Fortschritt zurück
   const save = loadSave();
   // gewähltes Design muss freigeschaltet sein; bekannte Freischaltungen merken (ohne Meldung beim ersten Mal)
   (function fixDesign() {
     if (!unlocked('face', save.icon)) save.icon = 0;
     if (!unlocked('color', save.color)) save.color = 0;
     if (!save.seen) save.seen = unlockedKeys();
+    writeSave();   // ein zurückgesetzter Stand wird gleich gespeichert (Toki gleicht ihn ab)
   })();
   // Ganzzahl zwischen 0 und max, alles andere wird 0.
   function clampInt(v, max) {
@@ -56,13 +58,15 @@
   function loadSave() {
     let raw = null;
     try { raw = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { raw = null; }
-    const data = { levels: {}, color: 0, muted: false, name: '' };
+    const data = { ver: SAVE_VER, levels: {}, color: 0, icon: 0, muted: false, name: '', seen: null };
     if (!raw || typeof raw !== 'object') return data;
-    data.color = clampInt(raw.color, PLAYER_COLORS.length - 1);
     data.muted = raw.muted === true;
     data.name = typeof raw.name === 'string' ? raw.name.replace(/[\u0000-\u001f<>]/g, '').slice(0, 16) : '';
     data.nameTyped = raw.nameTyped === true;
     data.fxReduced = raw.fxReduced === true;
+    // Neue Version der Level: Bestwerte, Münzen und Designs beginnen neu (Name, Ton, Effekte bleiben)
+    if (raw.ver !== SAVE_VER) return data;
+    data.color = clampInt(raw.color, PLAYER_COLORS.length - 1);
     data.icon = clampInt(raw.icon, FACE_COUNT - 1);
     data.seen = Array.isArray(raw.seen) ? raw.seen.filter((k) => typeof k === 'string' && /^(face|color)\d{1,2}$/.test(k)).slice(0, 40) : null;
     const levels = raw.levels && typeof raw.levels === 'object' ? raw.levels : {};

@@ -466,6 +466,42 @@
     if (extras.length) def.extras = (def.extras || []).concat(extras);
   }
 
+  /** Ein einzelnes Portal am Boden (z.B. 'N' = wieder gross, '2' = normales Tempo). */
+  function gate(ch) {
+    const s = seg(10);
+    s.put(ch, 4, 1);
+    return s.rows();
+  }
+
+  /** Abschnitte zusammenfügen (Bausteine dürfen mehrere Abschnitte liefern). */
+  function segs() {
+    const out = [];
+    for (let i = 0; i < arguments.length; i++) {
+      const it = arguments[i];
+      if (it.fx || typeof it[0] === 'string') out.push(it);
+      else it.forEach((x) => out.push(x));
+    }
+    return out;
+  }
+  /**
+   * Effekt-Trigger zwischen Abschnitten: fx('color', { theme: 3, fade: 1 }, dx, y).
+   * Wird beim Laden in def.extras umgewandelt (x = Spalte, an der er steht, + dx).
+   */
+  function fx(t, p, dx, y) { return { fx: true, t, p: p || {}, dx: dx || 0, y: y === undefined ? 5 : y }; }
+
+  /** Effekt-Marken aus der Karte holen und als extras ablegen. */
+  function takeFx(def) {
+    const map = [], extras = [];
+    let x = 0;
+    def.map.forEach((it) => {
+      if (it.fx) { extras.push({ x: x + it.dx, y: it.y, t: it.t, p: it.p }); return; }
+      map.push(it);
+      x += Math.max.apply(null, it.map((r) => r.length));
+    });
+    def.map = map;
+    if (extras.length) def.extras = (def.extras || []).concat(extras);
+  }
+
   /**
    * Effekte für Level ohne eigene Trigger: aus dem Aufbau abgeleitet.
    * Start-Drop: Blitz + Puls; Rakete: andere Farben + Zoom; Schwerkraft: Neigen;
@@ -1120,12 +1156,124 @@
     'saegewerk', 'wellenbrecher', 'spiegelwelt', 'nebelnacht', 'kaleidoskop',
     'ueberladung', 'sturmkern', 'neon-finale',
   ];
+  /**
+   * Effekt-Drehbuch im Takt der Musik (Optik, ändert die Strecke nicht).
+   * Die Musik hat 4 Takte Intro, dann im Kreis 8 Takte Drop, 4 Takte Break, 8 Takte Drop 2.
+   * Ein Takt sind 4 Schläge = 4 · 10,4 · 60 / bpm Kacheln (bei normalem Tempo).
+   * Dazu an Modus-Wechseln Farbe, Einflug-Stil und Farbversatz; bei Schwerkraft Neigen.
+   * manual = das Level hat eigene Farb-Trigger: dann keine automatischen Farbwechsel.
+   */
+  function autoFx2(def, own, partner, manual) {
+    const out = [], used = new Set();
+    // jede Art bekommt eine eigene Zeile, damit pro Zelle nur ein Trigger liegt
+    const ROW = { color: 9, area: 8, bg: 7, particles: 6, shock: 5, pulse: 4, flash: 3, chroma: 2, glitch: 1, blur: 0, camera: 9, zoom: 8, dark: 7, tilt: 6, shake: 5 };
+    const at = (x, t, p) => {
+      x = Math.max(1, Math.round(x));
+      let y = ROW[t];
+      while (used.has(x + ',' + y)) x++;
+      used.add(x + ',' + y);
+      out.push({ x, y, t, p });
+    };
+    let len = 0;
+    def.map.forEach((rows) => { len += Math.max.apply(null, rows.map((r) => r.length)); });
+    const look = def.look;
+    const bar = 4 * 10.4 * 60 / def.music.bpm;
+    const hard = def.difficulty;
+    // Intro
+    at(1, 'area', { style: look.area });
+    at(1, 'bg', { style: look.bg, ground: look.ground });
+    at(1, 'particles', { kind: look.particles });
+    at(1, 'camera', { y: 0.8, dur: 0.1 });
+    at(bar * 3, 'camera', { y: 0, dur: bar * 0.9 / 10.4 });
+    // Drops und Breaks bis zum Ende
+    for (let b = 4; b * bar < len - 30; b += 20) {
+      const d1 = b * bar, br = (b + 8) * bar, d2 = (b + 12) * bar;
+      at(d1, 'shock', { power: 3 });
+      at(d1, 'flash', { color: own % 6, dur: 0.5 });
+      at(d1, 'pulse', { power: Math.min(3, hard), dur: Math.min(10, bar * 8 / 10.4) });
+      at(d1, 'bg', { style: look.bg2, ground: (look.ground + 2) % 4 });
+      at(d1, 'area', { style: look.area2 });
+      if (hard >= 2) at(d1, 'glitch', { power: 1, dur: 0.3 });
+      for (let k = 2; k < 8; k += 2) {
+        const x = d1 + k * bar;
+        if (x > len - 30) break;
+        at(x, 'shock', { power: 1 });
+        if (hard >= 3) at(x, 'chroma', { power: 1, dur: 0.25 });
+      }
+      if (br < len - 40) {
+        at(br, 'blur', { power: 2, dur: 1 });
+        at(br, 'zoom', { zoom: 1.1, dur: 1.5 });
+        at(br, 'particles', { kind: look.particles === 2 ? 3 : 2 });
+        at(br, 'bg', { style: look.bg, ground: look.ground });
+        if (hard >= 2) at(br, 'dark', { power: 0.45, dur: 1.2 });
+      }
+      if (d2 < len - 40) {
+        at(d2, 'zoom', { zoom: 1, dur: 0.4 });
+        at(d2, 'dark', { power: 0, dur: 0.3 });
+        at(d2, 'shock', { power: 3 });
+        at(d2, 'flash', { color: (own + 2) % 6, dur: 0.5 });
+        at(d2, 'glitch', { power: 2, dur: 0.4 });
+        at(d2, 'chroma', { power: 2, dur: 0.5 });
+        at(d2, 'pulse', { power: 3, dur: Math.min(10, bar * 8 / 10.4) });
+        at(d2, 'particles', { kind: 1 });
+        at(d2, 'area', { style: look.area });
+        at(d2, 'bg', { style: (look.bg2 + 2) % 6, ground: look.ground });
+      }
+    }
+    // Modus- und Schwerkraft-Wechsel
+    const MODE = { S: 1, B: 1, F: 1, W: 1, R: 1, P: 1, X: 1 };
+    let x = 0, inMode = false, cols = 0;
+    def.map.forEach((rows) => {
+      const w = Math.max.apply(null, rows.map((r) => r.length));
+      for (let j = 0; j < w; j++) {
+        for (let i = 0; i < rows.length; i++) {
+          const ch = rows[i][j], cx = x + j;
+          if (MODE[ch] && !inMode) {
+            inMode = true; cols++;
+            if (!manual) at(cx, 'color', { theme: partner, fade: 0.5 });
+            at(cx, 'chroma', { power: 2, dur: 0.35 });
+            at(cx, 'area', { style: cols % 2 ? look.area2 : 3 });
+            at(cx, 'camera', { y: ch === 'S' || ch === 'F' || ch === 'X' || ch === 'W' ? 0.6 : 0, dur: 0.6 });
+          } else if (ch === 'C' && inMode) {
+            inMode = false;
+            if (!manual) at(cx, 'color', { theme: own, fade: 0.6 });
+            at(cx, 'shock', { power: 2 });
+            at(cx, 'area', { style: look.area });
+            at(cx, 'camera', { y: 0, dur: 0.6 });
+          } else if (ch === 'U') {
+            at(cx, 'tilt', { angle: -5, dur: 1 });
+          } else if (ch === 'D') {
+            at(cx, 'tilt', { angle: 0, dur: 0.8 });
+            at(cx, 'shake', { power: 1, dur: 0.3 });
+          }
+        }
+      }
+      x += w;
+    });
+    if (!manual && !cols) {
+      at(len / 2, 'color', { theme: partner, fade: 2 });
+      at(len - 60, 'color', { theme: own, fade: 1.5 });
+    }
+    // Finale
+    at(len - 50, 'glitch', { power: 2, dur: 0.6 });
+    at(len - 50, 'pulse', { power: 3, dur: 6 });
+    at(len - 12, 'shock', { power: 3 });
+    out.sort((a, b) => a.x - b.x || a.y - b.y);
+    return out;
+  }
+
   const ALL = LEVELS.concat(MORE, WORLD2);
   const SORTED = ORDER.map((id) => ALL.find((l) => l.id === id));
   SORTED.forEach((def, i) => {
     def.world = i < 15 ? 1 : 2;
     takeFx(def);
-    if (!def.extras) def.extras = autoFx(def, i, (i + 5) % 15);
+    // Grundstimmung: Hintergrund, Boden, Einflug, Partikel (für jedes Level anders)
+    const bg = [1, 3, 4, 2, 5, 0][i % 6];
+    def.look = def.look || {
+      bg, bg2: (bg + 3) % 6, ground: i % 4, area: [1, 3, 2, 4, 5][i % 5], area2: [3, 1, 4, 2, 1][i % 5], particles: [1, 2, 3][i % 3],
+    };
+    const manual = !!def.extras;
+    def.extras = (def.extras || []).concat(autoFx2(def, i, (i + 5) % SORTED.length, manual)).sort((a, b) => a.x - b.x);
   });
 
   if (typeof module !== 'undefined' && module.exports) module.exports = SORTED;
