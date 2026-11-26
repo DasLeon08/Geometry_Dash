@@ -493,7 +493,7 @@
    *   bg: Hintergrund (style 0–5) und Boden (ground 0–3)   particles: Umgebung (kind 0 aus, 1 Funken, 2 Schnee, 3 Blasen)
    */
   const FX = {
-    color: { theme: [0, 29, 0, true], fade: [0, 3, 1] },
+    color: { theme: [0, 49, 0, true], fade: [0, 3, 1] },
     shake: { power: [1, 3, 2, true], dur: [0.1, 2, 0.6] },
     flash: { color: [0, 5, 0, true], dur: [0.1, 1.5, 0.5] },
     pulse: { power: [1, 3, 2, true], dur: [0.5, 10, 4] },

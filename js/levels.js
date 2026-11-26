@@ -1155,7 +1155,226 @@
     'blechpark', 'spinnennetz', 'pendel', 'portalsprung',
     'saegewerk', 'wellenbrecher', 'spiegelwelt', 'nebelnacht', 'kaleidoskop',
     'ueberladung', 'sturmkern', 'neon-finale',
+    // Welt 3
+    'morgenrot', 'prisma', 'echolot', 'funkenflug', 'gezeiten',
+    'kettenreaktion', 'lichtjahr', 'schwerelos', 'donnerhall', 'supernova',
+    // Welt 4
+    'nordlicht', 'zeitsprung', 'polarwirbel', 'leuchtfeuer', 'fraktal',
+    'hyperraum', 'sturmflut', 'quantensprung', 'ereignishorizont', 'neon-ewigkeit',
   ];
+  // ====================================================================
+  // Welt 3 und Welt 4 (Effekte kommen vor allem aus autoFx2)
+  // ====================================================================
+  const col = (bgTop, bgBottom, accent, ground) => ({ bgTop, bgBottom, accent, ground });
+  const mus = (bpm, root, scale, prog, lead) => ({ bpm, root, scale, prog, lead });
+  const MAJ = [0, 2, 4, 7, 9], MIN = [0, 3, 5, 7, 10], DOR = [0, 2, 3, 5, 7, 9, 10], PHR = [0, 1, 3, 5, 7, 8, 10], LYD = [0, 2, 4, 6, 7, 9, 11], HM = [0, 2, 3, 5, 7, 8, 11];
+  const WORLD34 = [
+    // ---------------- Welt 3 ----------------
+    {
+      id: 'morgenrot', name: 'Morgenrot', difficulty: 1,
+      colors: col('#3a0f1a', '#ff7a4a', '#ffe0a0', '#40121c'), music: mus(124, 45, MAJ, [0, 4, 5, 3], [0, 2, 4, 2, 5, 4, 2, 0]),
+      map: segs(START, run('^...........^^............^.......'), pillars([1, 2, 3, 2]),
+        roller('B', { w: 70, low: [[14, 8]], high: [[26, 8]], put: [['c', 22, 5]] }),
+        run('......^^.........^.......'), padTower({ coin: true }),
+        flyer('S', { w: 80, floor: [[16, 3, 3], [36, 3, 4]], ceil: [[26, 3, 4], [46, 3, 3]], put: [['c', 31, 5]] }),
+        stairs([1, 2, 3], { spikes: 2 }), END),
+    },
+    {
+      id: 'prisma', name: 'Prisma', difficulty: 1,
+      colors: col('#10002a', '#6a3ad0', '#7dffea', '#14002e'), music: mus(128, 43, LYD, [0, 4, 1, 5], [0, 4, 6, 4, 2, 4, 1, 0]),
+      map: segs(START, run('^^..........^............^^.......'),
+        flyer('F', { w: 76, floor: [[16, 3, 2], [36, 3, 3]], ceil: [[26, 3, 4], [46, 3, 4]], put: [['c', 41, 5]] }),
+        run('.....^.........^^......'), orbOver(3, { put: [['c', 9, 4]] }),
+        flyer('W', { w: 76, floor: [[16, 4, 3], [38, 4, 3]], ceil: [[27, 4, 3], [49, 4, 3]], put: [['c', 33, 5]] }),
+        pillars([1, 2, 3]), END),
+    },
+    {
+      id: 'echolot', name: 'Echolot', difficulty: 2,
+      colors: col('#001018', '#0a5a6a', '#5effb0', '#001820'), music: mus(132, 41, DOR, [0, 3, 4, 0], [0, 2, 3, 4, 2, 0, 4, 3]),
+      map: segs(START, run('^^...........^^^..........^.......'),
+        robot({ w: 80, walls: [[14, 3, 1], [21, 3, 2], [28, 3, 3], [36, 3, 2], [43, 3, 1]], low: [[17, 4], [24, 4], [31, 5], [39, 4], [46, 6]], put: [['c', 30, 6]] }),
+        run('.....^^........^......'), orbChain(3, { coin: true }),
+        roller('P', { w: 90, low: [[14, 10], [44, 12]], high: [[28, 10], [60, 8]], put: [['c', 50, 9]] }),
+        stairs([2, 3, 2], { spikes: 3 }), END),
+    },
+    {
+      id: 'funkenflug', name: 'Funkenflug', difficulty: 2,
+      colors: col('#1a0800', '#c04a10', '#ffd84a', '#240a00'), music: mus(138, 44, MIN, [0, 5, 3, 4], [0, 3, 5, 3, 7, 5, 3, 1]),
+      map: segs(START, run('^^^..........^^...........^^.......'),
+        flyer('S', { w: 96, speed: '3', floor: [[16, 3, 4], [34, 3, 5], [52, 3, 3], [70, 3, 4]], ceil: [[25, 3, 4], [43, 3, 4], [61, 3, 5]], put: [['c', 57, 6]] }),
+        run('.....^^^........^^......'), padTower({ h: 4, coin: true }),
+        flyer('X', { w: 90, floor: [[14, 3, 4], [30, 3, 5], [46, 3, 4]], ceil: [[22, 3, 4], [38, 3, 4], [54, 3, 4]], put: [['c', 41, 6]] }),
+        orbOver(4), END),
+    },
+    {
+      id: 'gezeiten', name: 'Gezeiten', difficulty: 2,
+      colors: col('#00122a', '#1a6ad0', '#a0f0ff', '#001630'), music: mus(134, 42, MAJ, [0, 3, 5, 4], [4, 2, 0, 2, 5, 4, 2, 0]),
+      map: segs(START, run('^^..........^^^...........^.......'),
+        grav({ w: 64, v: [18, 30, 31], put: [['c', 24, 7]] }),
+        run('......^^........^......'),
+        roller('B', { w: 80, low: [[14, 8], [40, 10]], high: [[26, 10], [54, 8]], put: [['c', 34, 5]] }),
+        greens({ coin: true }),
+        pillars([2, 3, 2, 1]), END),
+    },
+    {
+      id: 'kettenreaktion', name: 'Kettenreaktion', difficulty: 3,
+      colors: col('#140a00', '#6a4010', '#ffb03b', '#1a0e00'), music: mus(146, 40, PHR, [0, 1, 4, 0], [0, 1, 4, 2, 5, 4, 1, 0]),
+      map: segs(START, run('^^^.........^^^..........^.^.......'),
+        tele({ len: 16, top: [14], coin: true }),
+        saws({ w: 52, saws: [[8, 0], [16, 0], [17, 0], [26, 0], [34, 0], [35, 0], [36, 0], [44, 3]], walls: [[30, 3, 1]], put: [['c', 31, 3]] }),
+        robot({ w: 90, speed: '3', walls: [[14, 3, 2], [22, 3, 3], [31, 3, 1], [39, 3, 3], [48, 3, 2], [57, 3, 3]],
+          low: [[17, 5], [25, 6], [34, 5], [42, 6], [51, 6], [60, 8]], spikes: [['z', 23, 4], ['z', 40, 4]], put: [['c', 46, 6]] }),
+        run('.....^^^.......^^.......'), orbChain(4), END),
+    },
+    {
+      id: 'lichtjahr', name: 'Lichtjahr', difficulty: 3,
+      colors: col('#000014', '#1a1a6a', '#ffe14a', '#00001c'), music: mus(150, 43, LYD, [0, 6, 4, 5], [0, 4, 6, 7, 6, 4, 2, 4]),
+      map: segs(START, run('^^^..........^^...........^^^.......'),
+        flyer('W', { w: 96, speed: '3', floor: [[14, 4, 3], [28, 4, 4], [42, 4, 3], [56, 4, 4]], ceil: [[21, 4, 4], [35, 4, 3], [49, 4, 4], [63, 4, 3]], put: [['c', 39, 4]] }),
+        run('.....^^^.........^^......'), orbChain(4, { coin: true }),
+        flyer('F', { w: 90, floor: [[14, 2, 3], [26, 2, 4], [38, 2, 3], [50, 2, 5]], ceil: [[20, 2, 5], [32, 2, 4], [44, 2, 5], [56, 2, 3]], put: [['c', 29, 2]] }),
+        stairs([2, 3, 4], { spikes: 3 }), END),
+    },
+    {
+      id: 'schwerelos', name: 'Schwerelos', difficulty: 3,
+      colors: col('#0a001a', '#4a1a7a', '#ff9bf0', '#10002a'), music: mus(144, 46, DOR, [0, 5, 3, 6], [0, 3, 2, 5, 4, 2, 6, 4]),
+      map: segs(START, run('^^...........^^^.........^.^.......'),
+        blue({ v: [6, 26], coin: true }),
+        flyer('X', { w: 90, floor: [[14, 3, 4], [30, 3, 5], [46, 3, 4]], ceil: [[22, 3, 4], [38, 3, 4], [54, 3, 4]] }),
+        roller('P', { w: 96, low: [[14, 10], [44, 12], [72, 8]], high: [[28, 10], [60, 8]], put: [['c', 50, 9]] }),
+        grav({ w: 70, v: [16, 25, 26, 44, 45], ceil: [[33, 4, 2, 34]], put: [['c', 35, 5]] }),
+        orbOver(5), END),
+    },
+    {
+      id: 'donnerhall', name: 'Donnerhall', difficulty: 4,
+      colors: col('#050008', '#2a0a3a', '#ff3b6b', '#08000e'), music: mus(166, 39, HM, [0, 3, 4, 5], [0, 3, 2, 5, 7, 5, 3, 2]),
+      map: segs(START, run('^^^.........^^^..........m^m.......'),
+        gate('K'), run('.....^.^......^^........^.^.^.......'),
+        flyer('S', { w: 90, floor: [[12, 2, 4], [22, 2, 5], [32, 2, 3], [42, 10, 3], [60, 2, 5]], ceil: [[17, 2, 4], [27, 2, 3], [37, 2, 5], [42, 10, 5], [66, 2, 5]],
+          spikes: [['^', 45, 3], ['v', 49, 4]], put: [['c', 56, 4]] }),
+        flyer('W', { w: 84, floor: [[12, 3, 4], [20, 3, 5], [28, 3, 4], [36, 3, 5], [44, 3, 4]], ceil: [[16, 3, 4], [24, 3, 3], [32, 3, 4], [40, 3, 3], [48, 3, 4]], put: [['c', 30, 5]] }),
+        gate('N'),
+        saws({ w: 44, saws: [[8, 0], [9, 0], [18, 0], [19, 0], [20, 0], [28, 0], [36, 0]] }),
+        orbChain(5, { coin: true }), END),
+    },
+    {
+      id: 'supernova', name: 'Supernova', difficulty: 4,
+      colors: col('#000000', '#5a1a00', '#ffe14a', '#0a0200'), music: mus(172, 44, MIN, [0, 3, 4, 5], [0, 3, 5, 7, 5, 3, 7, 5]),
+      map: segs(START, run('^^^..........^^^........m^m........'),
+        orbChain(5, { coin: true }),
+        roller('B', { w: 50, speed: '3', low: [[12, 6]], high: [[20, 8]] }),
+        flyer('F', { w: 50, speed: '3', floor: [[14, 2, 3]], ceil: [[22, 2, 4]], spikes: [['^', 30, 0], ['^', 31, 0], ['^', 32, 0]] }),
+        flyer('W', { w: 54, speed: '3', floor: [[14, 3, 4], [26, 3, 3]], ceil: [[20, 3, 3], [32, 3, 4]], put: [['c', 23, 4]] }),
+        robot({ w: 54, speed: '3', walls: [[14, 3, 2], [22, 3, 3], [31, 3, 2]], low: [[17, 5], [25, 6], [34, 6]] }),
+        roller('P', { w: 54, speed: '3', low: [[12, 10]], high: [[24, 8]], blocks: [[34, 5, 5, 1]] }),
+        flyer('X', { w: 56, speed: '3', floor: [[14, 3, 4]], ceil: [[26, 3, 4]], put: [['c', 21, 3]] }),
+        flyer('S', { w: 70, speed: '4', floor: [[14, 2, 4], [30, 2, 5]], ceil: [[22, 2, 4], [38, 2, 4]] }),
+        stairs([2, 3, 4, 3, 4], { spikes: 5 }), END),
+    },
+    // ---------------- Welt 4 ----------------
+    {
+      id: 'nordlicht', name: 'Nordlicht', difficulty: 1,
+      colors: col('#000a1a', '#0a6a5a', '#b0ff9b', '#001218'), music: mus(122, 47, MAJ, [0, 5, 3, 4], [0, 2, 4, 5, 4, 2, 0, 2]),
+      map: segs(START, run('^...........^^............^.......'), pillars([1, 2, 1, 2], { gap: 5 }),
+        flyer('F', { w: 80, floor: [[16, 3, 2], [36, 3, 3], [56, 3, 2]], ceil: [[26, 3, 4], [46, 3, 4]], put: [['c', 41, 6]] }),
+        run('.....^.........^^......'), padTower({ coin: true }),
+        orbOver(3, { put: [['c', 9, 4]] }), stairs([1, 2, 3], { spikes: 2 }), END),
+    },
+    {
+      id: 'zeitsprung', name: 'Zeitsprung', difficulty: 1,
+      colors: col('#1a1000', '#a07a20', '#fff0c0', '#201400'), music: mus(126, 45, DOR, [0, 3, 4, 3], [0, 2, 3, 2, 4, 3, 2, 0]),
+      map: segs(START, gate('1'), run('^............^^.............'), gate('2'),
+        roller('B', { w: 72, low: [[14, 8], [38, 8]], high: [[26, 8]], put: [['c', 32, 5]] }),
+        gate('3'), run('..........^.............^^...........'), gate('2'),
+        pillars([1, 2, 3], { gap: 5, put: [['c', 16, 5]] }), orbChain(2, { coin: true }), END),
+    },
+    {
+      id: 'polarwirbel', name: 'Polarwirbel', difficulty: 2,
+      colors: col('#00101a', '#2a8ab0', '#ffffff', '#00141e'), music: mus(136, 43, LYD, [0, 4, 5, 2], [0, 4, 6, 4, 2, 4, 1, 0]),
+      map: segs(START, run('^^...........^^^...........^.......'),
+        flyer('X', { w: 96, floor: [[16, 3, 4], [36, 3, 3], [56, 3, 5]], ceil: [[26, 3, 4], [46, 3, 5], [66, 3, 3]], put: [['c', 51, 2]] }),
+        grav({ w: 64, v: [18, 30, 31], put: [['c', 24, 7]] }),
+        run('......^^.........^^^......'), padTower({ h: 4, coin: true }), stairs([1, 2, 3], { spikes: 3 }), END),
+    },
+    {
+      id: 'leuchtfeuer', name: 'Leuchtfeuer', difficulty: 2,
+      colors: col('#1a0400', '#d0401a', '#ffe14a', '#240600'), music: mus(140, 41, MIN, [0, 3, 1, 4], [0, 3, 1, 4, 3, 0, 4, 2]),
+      map: segs(START, run('^^...........^^^..........^.......'),
+        robot({ w: 84, walls: [[14, 2, 2], [20, 2, 3], [26, 2, 1], [31, 2, 3], [37, 2, 2]], low: [[16, 4], [22, 4], [28, 3], [33, 4], [39, 6]], put: [['c', 24, 6]] }),
+        saws({ w: 40, saws: [[8, 0], [9, 0], [18, 0], [19, 0], [28, 0]], put: [['c', 18, 3]] }),
+        flyer('S', { w: 90, floor: [[16, 3, 4], [36, 3, 5], [56, 3, 4]], ceil: [[26, 3, 4], [46, 3, 4]], put: [['c', 51, 6]] }),
+        orbOver(4), END),
+    },
+    {
+      id: 'fraktal', name: 'Fraktal', difficulty: 2,
+      colors: col('#0a1a00', '#4a8a10', '#ff5ec8', '#0e2000'), music: mus(142, 44, PHR, [0, 5, 6, 4], [0, 3, 1, 4, 3, 5, 4, 1]),
+      map: segs(START, run('^^...........^^............^.......'),
+        gate('K'), run('.....^.^......^^........^.^.......'),
+        flyer('F', { w: 76, floor: [[12, 2, 3], [22, 2, 4], [32, 2, 3]], ceil: [[17, 2, 5], [27, 2, 4], [37, 2, 5]], put: [['c', 27, 2]] }),
+        roller('B', { w: 64, low: [[12, 6], [28, 6]], high: [[20, 6], [36, 6]], put: [['c', 24, 5]] }),
+        gate('N'), run('.....^^........^......'), orbChain(3, { coin: true }), END),
+    },
+    {
+      id: 'hyperraum', name: 'Hyperraum', difficulty: 3,
+      colors: col('#000010', '#1a0a5a', '#5ee6ff', '#000018'), music: mus(154, 42, HM, [0, 6, 5, 4], [0, 2, 4, 6, 5, 4, 2, 1]),
+      map: segs(START, run('^^^..........^^...........^^^.......'),
+        flyer('S', { w: 100, speed: '4', floor: [[16, 3, 4], [36, 3, 5], [56, 3, 4], [76, 3, 4]], ceil: [[26, 3, 4], [46, 3, 4], [66, 3, 5]], put: [['c', 61, 6]] }),
+        run('.....^^^.........^^......'), orbChain(4, { coin: true }),
+        flyer('W', { w: 96, speed: '3', floor: [[14, 4, 3], [28, 4, 4], [42, 4, 3], [56, 4, 4]], ceil: [[21, 4, 4], [35, 4, 3], [49, 4, 4], [63, 4, 3]], put: [['c', 39, 4]] }),
+        stairs([2, 3, 4], { spikes: 3 }), END),
+    },
+    {
+      id: 'sturmflut', name: 'Sturmflut', difficulty: 3,
+      colors: col('#001018', '#0a3a5a', '#7dffea', '#00141c'), music: mus(150, 40, MIN, [0, 5, 3, 4], [0, 3, 2, 5, 3, 1, 0, 2]),
+      map: segs(START, run('^^...........^^^...........^.......'),
+        roller('P', { w: 100, low: [[12, 12], [40, 12], [70, 10]], high: [[26, 10], [56, 10]], blocks: [[30, 5, 6, 1], [60, 4, 6, 1]], put: [['c', 32, 4], ['c', 62, 3]] }),
+        roller('B', { w: 70, speed: '3', low: [[14, 8], [36, 8]], high: [[24, 10], [48, 8]] }),
+        run('.....^^^........^^.......'), orbChain(4, { coin: true }),
+        pillars([2, 3, 4, 3]), END),
+    },
+    {
+      id: 'quantensprung', name: 'Quantensprung', difficulty: 3,
+      colors: col('#0a0020', '#5a0a8a', '#00d0ff', '#10002a'), music: mus(152, 45, DOR, [0, 3, 1, 4], [0, 4, 2, 3, 4, 1, 2, 0]),
+      map: segs(START, run('^^...........^^............^.......'),
+        tele({ len: 16, top: [14], coin: true }),
+        greens({ coin: true }),
+        flyer('F', { w: 90, floor: [[14, 2, 3], [26, 2, 4], [38, 2, 3], [50, 2, 5]], ceil: [[20, 2, 5], [32, 2, 4], [44, 2, 5], [56, 2, 3]], put: [['c', 29, 2]] }),
+        tele({ len: 12, top: [] }),
+        orbChain(4), END),
+    },
+    {
+      id: 'ereignishorizont', name: 'Ereignishorizont', difficulty: 4,
+      colors: col('#000000', '#14141f', '#ffffff', '#050508'), music: mus(168, 38, PHR, [0, 1, 5, 4], [0, 1, 3, 5, 4, 3, 1, 0]),
+      map: segs(START, fx('dark', { power: 0.7, dur: 2 }, 0, 4), run('^^^..........^^^........m^m........'),
+        fx('mirror', { on: 1, dur: 0.6 }, 2, 3),
+        roller('B', { w: 70, low: [[12, 8], [36, 8]], high: [[24, 8], [48, 6]] }),
+        fx('mirror', { on: 0, dur: 0.6 }, 0, 3),
+        flyer('W', { w: 80, speed: '3', floor: [[14, 3, 4], [24, 3, 3], [34, 3, 5], [44, 3, 4]], ceil: [[19, 3, 4], [29, 3, 5], [39, 3, 3], [49, 3, 4]], put: [['c', 31, 3]] }),
+        robot({ w: 64, walls: [[14, 3, 2], [21, 3, 3], [29, 3, 2], [36, 3, 3]], low: [[17, 4], [24, 5], [32, 4], [39, 6]], spikes: [['z', 22, 5]], put: [['c', 26, 6]] }),
+        fx('dark', { power: 0, dur: 1 }, 0, 4),
+        roller('P', { w: 80, low: [[12, 12], [40, 12]], high: [[26, 10], [56, 10]], blocks: [[30, 5, 6, 1]], put: [['c', 32, 4]] }),
+        flyer('X', { w: 80, speed: '3', floor: [[14, 3, 4], [30, 3, 5], [46, 3, 4]], ceil: [[22, 3, 4], [38, 3, 4]] }),
+        stairs([2, 3, 4, 3, 4], { spikes: 5 }), END),
+    },
+    {
+      id: 'neon-ewigkeit', name: 'Neon-Ewigkeit', difficulty: 4,
+      colors: col('#05001a', '#3a0a7a', '#ff5ec8', '#08001e'), music: mus(176, 46, HM, [0, 3, 4, 5], [0, 4, 2, 6, 7, 4, 2, 5]),
+      map: segs(START, run('^^^..........^^^........m^m........'),
+        orbChain(5, { coin: true }),
+        flyer('S', { w: 96, floor: [[12, 2, 5], [22, 2, 6], [32, 2, 5], [44, 14, 3]], ceil: [[17, 2, 3], [27, 2, 3], [37, 2, 4], [44, 14, 4]],
+          spikes: [['^', 48, 3], ['v', 52, 5]], put: [['c', 64, 7]] }),
+        roller('B', { w: 50, speed: '3', low: [[12, 6]], high: [[20, 8]] }),
+        flyer('F', { w: 64, floor: [[14, 2, 3], [26, 2, 4]], ceil: [[20, 2, 4], [32, 2, 3]] }),
+        flyer('W', { w: 84, speed: '3', floor: [[12, 3, 4], [20, 3, 5], [28, 3, 4], [36, 3, 5], [44, 3, 4]], ceil: [[16, 3, 4], [24, 3, 3], [32, 3, 4], [40, 3, 3], [48, 3, 4]] }),
+        robot({ w: 54, speed: '3', walls: [[14, 3, 2], [22, 3, 3], [31, 3, 2]], low: [[17, 5], [25, 6], [34, 6]], put: [['c', 24, 6]] }),
+        roller('P', { w: 54, speed: '3', low: [[12, 10]], high: [[24, 8]], blocks: [[34, 5, 5, 1]] }),
+        greens({}),
+        flyer('X', { w: 80, speed: '3', floor: [[14, 3, 4], [30, 3, 5], [46, 3, 4]], ceil: [[22, 3, 4], [38, 3, 4]] }),
+        flyer('S', { w: 70, speed: '4', floor: [[14, 2, 4], [30, 2, 5]], ceil: [[22, 2, 4], [38, 2, 4]] }),
+        stairs([2, 3, 4, 3, 4], { spikes: 5 }), END),
+    },
+  ];
+
   /**
    * Effekt-Drehbuch im Takt der Musik (Optik, ändert die Strecke nicht).
    * Die Musik hat 4 Takte Intro, dann im Kreis 8 Takte Drop, 4 Takte Break, 8 Takte Drop 2.
@@ -1262,17 +1481,17 @@
     return out;
   }
 
-  const ALL = LEVELS.concat(MORE, WORLD2);
+  const ALL = LEVELS.concat(MORE, WORLD2, WORLD34);
   const SORTED = ORDER.map((id) => ALL.find((l) => l.id === id));
   SORTED.forEach((def, i) => {
-    def.world = i < 15 ? 1 : 2;
+    def.world = i < 15 ? 1 : i < 30 ? 2 : i < 40 ? 3 : 4;
     takeFx(def);
     // Grundstimmung: Hintergrund, Boden, Einflug, Partikel (für jedes Level anders)
     const bg = [1, 3, 4, 2, 5, 0][i % 6];
     def.look = def.look || {
       bg, bg2: (bg + 3) % 6, ground: i % 4, area: [1, 3, 2, 4, 5][i % 5], area2: [3, 1, 4, 2, 1][i % 5], particles: [1, 2, 3][i % 3],
     };
-    const manual = !!def.extras;
+    const manual = !!def.extras && def.extras.some((e) => e.t === 'color');
     def.extras = (def.extras || []).concat(autoFx2(def, i, (i + 5) % SORTED.length, manual)).sort((a, b) => a.x - b.x);
   });
 

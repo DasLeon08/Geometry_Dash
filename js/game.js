@@ -8,6 +8,7 @@
   const A = window.GameAudio;
   const C = E.C;
   const TS = 40;                 // Pixel pro Kachel (logisch)
+  const WORLDS = 4;             // Welten im Menü (Tabs)
   const PLAYER_SCREEN_X = 7;     // Spieler steht so viele Kacheln vom linken Rand
   const SAVE_KEY = 'neonhop.save.v1';
   const FONT = 'Fredoka, "Trebuchet MS", system-ui, sans-serif';
@@ -32,7 +33,7 @@
    */
   const UNLOCKS = {
     face: [null, null, { coins: 3 }, { levels: 3 }, { coins: 10 }, { levels: 6 }, { coins: 20 }, { world2: 1 },
-      { levels: 10 }, { coins: 30 }, { world1: 15 }, { coins: 45 }, { world2: 5 }, { coins: 60 }, { extreme: 6 }, { levels: 30 }],
+      { levels: 10 }, { coins: 30 }, { world1: 15 }, { coins: 45 }, { world2: 5 }, { coins: 60 }, { extreme: window.LEVELS.filter((d) => d.difficulty === 4).length }, { levels: window.LEVELS.length }],
     color: [null, null, null, null, null, null, { coins: 5 }, { levels: 4 }, { coins: 15 }, { levels: 8 }, { coins: 40 }, { levels: 20 }],
   };
 
@@ -362,8 +363,10 @@
     $('pgLabel').innerHTML = '<b>' + a + '–' + b + '</b>von ' + n;
     const mid = Math.min(n - 1, first + Math.floor(visibleCards() / 2));
     const w = (window.LEVELS[mid] && window.LEVELS[mid].world) || 1;
-    $('world1').classList.toggle('on', w === 1); $('world2').classList.toggle('on', w === 2);
-    $('world1').setAttribute('aria-selected', String(w === 1)); $('world2').setAttribute('aria-selected', String(w === 2));
+    for (let k = 1; k <= WORLDS; k++) {
+      $('world' + k).classList.toggle('on', w === k);
+      $('world' + k).setAttribute('aria-selected', String(w === k));
+    }
     $('pgPrev').disabled = wrap.scrollLeft <= 2;
     $('pgNext').disabled = wrap.scrollLeft >= wrap.scrollWidth - wrap.clientWidth - 2;
   }
@@ -389,11 +392,12 @@
     if (i < 0) return;
     A.sfx('click');
     const wrap = $('levels');
-    wrap.scrollTo({ left: i * cardStep(), behavior: 'smooth' });
+    const far = Math.abs(wrap.scrollLeft / cardStep() - i) > 6;
+    wrap.scrollTo({ left: i * cardStep(), behavior: far ? 'auto' : 'smooth' });   // weite Sprünge sofort
     lastTarget = { i, t: performance.now() };
+    if (far) updatePager();
   }
-  $('world1').onclick = () => goWorld(1);
-  $('world2').onclick = () => goWorld(2);
+  for (let k = 1; k <= WORLDS; k++) $('world' + k).onclick = () => goWorld(k);
   $('pgPrev').onclick = () => { A.sfx('click'); scrollCards(-1, true); };
   $('pgNext').onclick = () => { A.sfx('click'); scrollCards(1, true); };
 
