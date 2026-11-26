@@ -262,13 +262,20 @@
       transform: rotate(-3deg); transform-origin: left center; filter: drop-shadow(0 6px 0 var(--ink));
     }
     .tagline { margin: 10px 0 0; color: #fff; font-size: 15px; font-weight: 600; }
-    .worlds { display: flex; gap: 8px; margin-top: 12px; }
+    .worlds { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     .worlds button {
-      height: 34px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 700; color: var(--ink);
+      height: 34px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 700; color: var(--ink); white-space: nowrap;
       background: rgba(255,255,255,0.75); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink);
     }
     .worlds button span { font-weight: 600; font-size: 12px; color: var(--sub); }
     .worlds button.on { background: var(--sun); }
+    .worlds .inf-btn { background: var(--rose); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.3); }
+    .worlds .inf-btn b { font-size: 18px; }
+    .worlds .inf-btn span { color: #fff; opacity: .85; }
+    #infResult .title { font-size: 44px; }
+    .inf-best { margin: 2px 0 4px; font-weight: 700; color: var(--sub); }
+    .inf-best.new { color: #1fa85a; }
+    .inf-rank { margin: 0 0 12px; font-size: 14px; color: var(--sub); min-height: 1.2em; }
     .worlds button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
     .menu-actions { display: flex; align-items: center; gap: 10px; }
     .pager { display: flex; align-items: center; gap: 8px; margin-right: 6px; }
@@ -575,6 +582,7 @@
       .design-btn canvas { width: 32px; height: 32px; }
       .worlds button { height: 28px; padding: 0 10px; font-size: 12px; }
       .worlds button span { display: none; }
+      .worlds .inf-btn span { display: inline; }
       .page-label { min-width: 64px; font-size: 11px; }
       .page-label b { font-size: 15px; }
       .pager .icon-btn, .menu-actions .icon-btn { width: 42px; height: 42px; }
@@ -666,9 +674,10 @@
           <p class="tagline">Spring im Takt, flieg durch Tunnel, dreh die Schwerkraft um.</p>
           <div class="worlds" id="worlds" role="tablist" aria-label="Welten">
             <button id="world1" role="tab">Welt 1</button>
-            <button id="world2" role="tab">Welt 2 <span>Neue Fähigkeiten</span></button>
+            <button id="world2" role="tab">Welt 2</button>
             <button id="world3" role="tab">Welt 3</button>
             <button id="world4" role="tab">Welt 4</button>
+            <button id="infBtn" class="inf-btn"><b>∞</b> Infinity <span id="infBtnBest"></span></button>
           </div>
         </div>
         <div class="menu-actions">
@@ -919,13 +928,29 @@
     </div>
   </div>
 
+  <div id="infResult" class="overlay dim hidden">
+    <div class="panel">
+      <div class="eyebrow">Infinity</div>
+      <div class="title" id="infDist">0 m</div>
+      <p class="inf-best" id="infBest"></p>
+      <p class="inf-rank" id="infRank"></p>
+      <button class="btn-go" id="infAgain"><svg class="i"><use href="#i-restart"/></svg>Nochmal</button>
+      <div class="tiles" style="grid-template-columns: 1fr 1fr">
+        <button class="tile" id="infBoard"><svg class="i"><use href="#i-trophy"/></svg>Rangliste</button>
+        <button class="tile" id="infMenu"><svg class="i"><use href="#i-home"/></svg>Menü</button>
+      </div>
+    </div>
+  </div>
+
   <div id="rotate" class="overlay hidden show-if-portrait">
     <div class="phone">📱</div>
     <div>Bitte dreh dein Gerät ins Querformat.</div>
   </div>
 
   <script src="js/engine.js"></script>
+  <script src="js/kit.js"></script>
   <script src="js/levels.js"></script>
+  <script src="js/infinite.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/config.js"></script>
   <script src="js/multiplayer.js"></script>

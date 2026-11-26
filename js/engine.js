@@ -178,6 +178,57 @@
     };
   }
 
+  /**
+   * Infinity-Modus: einen Abschnitt (10 Zeilen) hinten an ein laufendes Level hängen.
+   * Objekte, Spalten, Länge und Teleport-Ziele werden ergänzt; bestehende Objekte bleiben,
+   * darum ändert sich am bisherigen Lauf nichts.
+   */
+  function extendLevel(level, rows) {
+    const offset = level.length;
+    const width = Math.max.apply(null, rows.map((r) => r.length));
+    const fresh = [];
+    rows.forEach((row, i) => {
+      const y = rows.length - 1 - i;
+      for (let j = 0; j < row.length; j++) {
+        const ch = row[j];
+        if (ch === '.' || ch === ' ') continue;
+        const type = CHAR_TYPES[ch];
+        if (!type) throw new Error('unbekanntes Zeichen "' + ch + '"');
+        const x = offset + j;
+        fresh.push({ type, x, y, hb: hitbox(type, x, y) });
+      }
+    });
+    fresh.sort((a, b) => a.x - b.x || a.y - b.y);
+    const blockAt = new Set(fresh.filter((o) => o.type === 'block').map((o) => o.x + ',' + o.y));
+    fresh.forEach((o) => {
+      o.id = level.objects.length;
+      level.objects.push(o);
+      if (o.type === 'block') {
+        o.n = {
+          up: blockAt.has(o.x + ',' + (o.y + 1)), down: blockAt.has(o.x + ',' + (o.y - 1)),
+          left: blockAt.has((o.x - 1) + ',' + o.y), right: blockAt.has((o.x + 1) + ',' + o.y),
+        };
+      }
+      if (o.type === 'teleIn') {
+        const out = fresh.find((q) => q.type === 'teleOut' && q.x >= o.x);
+        if (out) { o.dest = out.y; o.destX = out.x; }
+      }
+      if (o.type === 'coin') level.coinCount++;
+    });
+    level.length = offset + width;
+    while (level.cols.length <= level.length + 4) level.cols.push([]);
+    fresh.forEach((o) => {
+      const a = Math.max(0, Math.floor(o.hb[0]));
+      const b = Math.min(level.cols.length - 1, Math.floor(o.hb[2]));
+      for (let c = a; c <= b; c++) level.cols[c].push(o);
+    });
+    return level;
+  }
+  /** Leeres, endloses Level (Infinity-Modus); Abschnitte kommen mit extendLevel dazu. */
+  function endlessLevel(def) {
+    return { def, objects: [], cols: [[], [], [], [], []], length: 0, coinCount: 0, endless: true };
+  }
+
   function createState() {
     return {
       x: 0, y: 0, vy: 0,
@@ -447,7 +498,7 @@
       }
     }
 
-    if (s.x >= level.length) {
+    if (!level.endless && s.x >= level.length) {
       s.won = true;
       s.events.push('win');
     }
@@ -540,7 +591,7 @@
     return out.sort((a, b) => a.x - b.x || a.y - b.y);
   }
 
-  const Engine = { C, MODES, FLYERS, MODE_PORTALS, parseLevel, createState, cloneState, step, runReplay, CHAR_TYPES, SPEEDS, FX, fxDefaults, cleanExtras, MAX_EXTRAS };
+  const Engine = { C, MODES, FLYERS, MODE_PORTALS, parseLevel, extendLevel, endlessLevel, createState, cloneState, step, runReplay, CHAR_TYPES, SPEEDS, FX, fxDefaults, cleanExtras, MAX_EXTRAS };
   if (typeof module !== 'undefined' && module.exports) module.exports = Engine;
   else root.Engine = Engine;
 })(this);

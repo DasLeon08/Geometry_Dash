@@ -68,6 +68,7 @@
     // Neue Version der Level: Bestwerte, Münzen und Designs beginnen neu (Name, Ton, Effekte bleiben)
     if (raw.ver !== SAVE_VER) return data;
     data.color = clampInt(raw.color, PLAYER_COLORS.length - 1);
+    data.infBest = clampInt(raw.infBest, 1e7);
     data.icon = clampInt(raw.icon, FACE_COUNT - 1);
     data.seen = Array.isArray(raw.seen) ? raw.seen.filter((k) => typeof k === 'string' && /^(face|color)\d{1,2}$/.test(k)).slice(0, 40) : null;
     const levels = raw.levels && typeof raw.levels === 'object' ? raw.levels : {};
@@ -501,6 +502,8 @@
     });
 
     drawDesignPreview($('designPrev'), 40);
+    $('infBtnBest').textContent = save.infBest ? save.infBest + ' m' : '';
+    prefetchInfinity();
     $('designNew').classList.toggle('hidden', !newDesigns);
     updateSoundBtn();
   }
@@ -586,6 +589,8 @@
     ['editor', 'edSettings', 'edFx', 'community'].forEach((id) => { if ($(id)) show(id, false); });
     game.groundOverride = null;
     game.custom = null;
+    game.infinite = null;
+    show('infResult', false);
     game.scene = 'menu';
     game.paused = false;
     A.resumeAll();
@@ -608,10 +613,16 @@
       $('pauseLevel').textContent = def.name;
       $('pauseAttempt').textContent = 'Versuch ' + game.attempts;
       $('pauseBest').textContent = 'Bestwert ' + (game.practice ? sv.practice : sv.best) + '%';
+      if (game.infinite) {
+        $('pauseRing').style.setProperty('--p', 0);
+        $('pausePct').textContent = Math.floor(game.state.x) + ' m';
+        $('pauseAttempt').textContent = 'Infinity';
+        $('pauseBest').textContent = 'Bestwert ' + save.infBest + ' m';
+      }
       show('pausePractice', game.practice);
       $('togglePracticeBtn').querySelector('span').textContent = game.practice ? 'Normal spielen' : 'Übungsmodus';
       $('togglePracticeBtn').classList.toggle('on', game.practice);
-      show('togglePracticeBtn', !game.race && !game.custom);
+      show('togglePracticeBtn', !game.race && !game.custom && !game.infinite);
       $('menuBtn').lastChild.textContent = game.race ? 'Lobby' : game.custom ? (game.custom.label || 'Zurück') : 'Menü';
       if (game.custom) $('pauseLevel').textContent = game.level.def.name;
       A.pauseAll();
@@ -1089,6 +1100,7 @@
     game.race = !!race;
     game.countdown = race && !noCountdown ? COUNTDOWN : 0;
     game.custom = null;
+    game.infinite = null;
     game.levelIndex = index;
     game.level = E.parseLevel(window.LEVELS[index]);
     startPrepared(practice);
@@ -1104,6 +1116,7 @@
     game.race = false;
     game.countdown = 0;
     game.custom = Object.assign({ startX: 0 }, opts || {});
+    game.infinite = null;
     game.levelIndex = -1;
     game.level = E.parseLevel(def);
     startPrepared(false);
@@ -1134,14 +1147,101 @@
     restartAttempt();
   }
 
+  // ---------------------------------------------------------------------
+  // Infinity-Modus: endlose, zufällige Strecke (js/infinite.js)
+  // ---------------------------------------------------------------------
+  const INF = window.NeonInfinite;
+  const INF_MUSIC = { bpm: 150, root: 43, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 3, 4], lead: [0, 2, 4, 6, 5, 4, 2, 1] };
+  let infTicket = null;   // vom Server vergebener Lauf (Seed + Lauf-ID), im Voraus geholt
+  function cleanInf(list) { return E.cleanExtras(list || [], 1e9).concat([]); }
+  /** Beim Öffnen des Menüs schon einen Lauf beim Server holen (weckt ihn auch auf). */
+  function prefetchInfinity() {
+    if (infTicket || !window.NeonCommunity || !NeonCommunity.infinityStart) return;
+    NeonCommunity.infinityStart().then((t) => { infTicket = t; }).catch(() => {});
+  }
+  function localSeed() {
+    const b = new Uint32Array(1);
+    (window.crypto || window.msCrypto).getRandomValues(b);
+    return b[0] >>> 0;
+  }
+  function startInfinity() {
+    A.unlock();
+    A.stopMusic();
+    const ticket = infTicket;
+    infTicket = null;
+    const seed = ticket ? ticket.seed : localSeed();
+    game.race = false;
+    game.countdown = 0;
+    game.custom = null;
+    game.levelIndex = -1;
+    const def = {
+      id: 'infinity', name: 'Infinity', difficulty: 3, endless: true,
+      colors: window.LEVELS[seed % window.LEVELS.length].colors, music: INF_MUSIC, extras: [],
+      look: { bg: 1, ground: 2, area: 1, particles: 1 },
+    };
+    const level = E.endlessLevel(def);
+    const gen = INF.create(seed);
+    INF.fill(gen, level, INF.AHEAD + 40, def.extras);
+    game.level = level;
+    game.infinite = { seed, run: ticket ? ticket.run : null, gen, shown: false, result: null };
+    show('infResult', false);
+    startPrepared(false);
+    prefetchInfinity();   // gleich den nächsten Lauf vorbereiten
+  }
+  /** Strecke vor der Spielfigur verlängern, neue Effekte hinten anhängen. */
+  function growInfinity() {
+    const fresh = [];
+    INF.fill(game.infinite.gen, game.level, game.state.x + INF.AHEAD + 40, fresh);
+    cleanInf(fresh).forEach((e) => fx.list.push(e));
+    game.level.deco = buildDeco(game.level);
+  }
+  function infinityDeath() {
+    const inf = game.infinite;
+    const dist = Math.floor(game.state.x);
+    inf.distance = dist;
+    inf.newBest = dist > save.infBest;
+    if (inf.newBest) { save.infBest = dist; writeSave(); reportScore(); }
+    // Lauf an die Rangliste schicken (der Server spielt ihn nach)
+    const r = game.rec;
+    if (inf.run && r && window.NeonCommunity && NeonCommunity.infinitySubmit) {
+      inf.result = 'pending';
+      NeonCommunity.infinitySubmit(inf.run, { h0: r.h0, t: r.t.slice() }, dist)
+        .then((res) => { inf.result = res; if (inf.shown) renderInfResult(); })
+        .catch((e) => { inf.result = { error: e && e.message }; if (inf.shown) renderInfResult(); });
+    }
+  }
+  function showInfResult() {
+    A.stopMusic(true);
+    show('hud', false);
+    renderInfResult();
+    show('infResult', true);
+  }
+  function renderInfResult() {
+    const inf = game.infinite;
+    if (!inf) return;
+    $('infDist').textContent = inf.distance + ' m';
+    $('infBest').textContent = inf.newBest ? 'Neuer Bestwert!' : 'Bestwert: ' + save.infBest + ' m';
+    $('infBest').classList.toggle('new', !!inf.newBest);
+    let rank = '';
+    if (!inf.run) rank = 'Ohne Verbindung zur Rangliste – dieser Lauf zählt nur für dich.';
+    else if (inf.result === 'pending') rank = 'Wird in der Rangliste eingetragen …';
+    else if (inf.result && inf.result.error) rank = inf.result.error;
+    else if (inf.result) rank = 'Rang heute: ' + inf.result.rankDay + ' · insgesamt: ' + inf.result.rankAll;
+    $('infRank').textContent = rank;
+  }
+  $('infBtn').onclick = () => { A.sfx('click'); startInfinity(); };
+  $('infAgain').onclick = () => { A.sfx('click'); startInfinity(); };
+  $('infMenu').onclick = () => { A.sfx('click'); goMenu(); };
+
   function restartLevel() {
+    if (game.infinite) { startInfinity(); return; }
     game.checkpoints = [];
     restartAttempt();
   }
 
   function restartAttempt() {
     game.attempts++;
-    if (!game.practice) {
+    if (!game.practice && !game.infinite) {
       const sv = levelSave(game.level.def.id);
       sv.attempts = (sv.attempts || 0) + 1;
       writeSave();
@@ -1188,16 +1288,10 @@
     A.sfx('click');
   }
 
-  /**
-   * Punkte für die Toki-Bestenliste: Summe der Bestwerte (normaler Modus)
-   * über alle Level, also 0–100 pro Level und 3000 für alle 30 geschafft.
-   * Der Wert kann nur steigen, egal welches Level gerade gespielt wird.
-   */
-  function totalScore() {
-    return window.LEVELS.reduce((sum, def) => sum + levelSave(def.id).best, 0);
-  }
+  /** Toki-Bestenliste: zählt den besten Infinity-Lauf (in Kacheln). */
   function reportScore() {
-    try { if (window.toki && typeof window.toki.score === 'function') window.toki.score(totalScore()); } catch (e) { /* egal */ }
+    if (!(save.infBest > 0)) return;
+    try { if (window.toki && typeof window.toki.score === 'function') window.toki.score(save.infBest); } catch (e) { /* egal */ }
   }
 
   function onDeath() {
@@ -1210,12 +1304,12 @@
     shatter(s.x, s.y, s.size, PLAYER_COLORS[save.color]);
     game.flash = Math.max(game.flash, 0.3);
     game.trail.length = 0;
+    if (game.infinite) { infinityDeath(); return; }
     const pct = progress();
     const sv = levelSave(game.level.def.id);
     if (game.practice) sv.practice = Math.max(sv.practice, pct);
     else sv.best = Math.max(sv.best, pct);
     writeSave();
-    if (!game.practice) reportScore();
   }
 
   function onWin() {
@@ -1240,7 +1334,7 @@
       });
     }
     writeSave();
-    if (!game.practice) { reportScore(); if (game.levelIndex >= 0) checkUnlocks(); }
+    if (!game.practice && game.levelIndex >= 0) checkUnlocks();
     for (let i = 0; i < 6; i++) {
       setTimeout(() => burst(s.x - 2 + Math.random() * 4, 3 + Math.random() * 5,
         ['#ffd84a', '#5ee6ff', '#ff5ec8'], 24, 7), i * 160);
@@ -1260,13 +1354,17 @@
     const s = game.state;
     if (s.dead) {
       game.deathTimer -= dt;
-      if (game.deathTimer <= 0) restartAttempt();
+      if (game.deathTimer <= 0) {
+        if (!game.infinite) restartAttempt();
+        else if (!game.infinite.shown) { game.infinite.shown = true; showInfResult(); }
+      }
       return;
     }
     if (game.rec) {
       if (held !== game.rec.last) { game.rec.t.push(game.rec.steps); game.rec.last = held; }
       game.rec.steps++;
     }
+    if (game.infinite && s.x > game.level.length - INF.AHEAD) growInfinity();
     E.step(s, game.level, held, dt);
     for (let i = 0; i < s.events.length; i++) {
       const ev = s.events[i];
@@ -1348,7 +1446,7 @@
   /** Beim (Neu-)Start: Trigger vor der Startposition gelten als schon passiert (nur Farbe zählt). */
   function fxReset(startX) {
     const def = game.level.def;
-    fx.list = E.cleanExtras(def.extras || []);
+    fx.list = def.endless ? cleanInf(def.extras) : E.cleanExtras(def.extras || []);
     fx.next = 0;
     fx.base = def.colors;
     fx.color = null; fx.zoom = null; fx.pulseUntil = 0;
@@ -2316,6 +2414,7 @@
 
   let hudPct = 0;
   function drawHud() {
+    if (game.infinite) { drawInfHud(); return; }
     const pct = progress();
     hudPct += (pct - hudPct) * 0.25;
     if (pct < hudPct) hudPct = pct;
@@ -2368,8 +2467,19 @@
     ctx.textBaseline = 'alphabetic';
   }
 
+  /** Infinity: Distanz gross in der Mitte, darunter Bestwert und Stufe. */
+  function drawInfHud() {
+    const d = Math.floor(game.state.x), best = save.infBest;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    outlinedText(d + ' m', viewW / 2, 34, 30, d > best && best > 0 ? '#7dff9a' : '#fff', 6);
+    const tier = Math.min(4, Math.floor(d / INF.TIER_LEN)) + 1;
+    outlinedText('Bestwert ' + Math.max(best, 0) + ' m  ·  Stufe ' + tier, viewW / 2, 64, 15, '#ffe066', 4);
+    ctx.textBaseline = 'alphabetic';
+  }
+
   function drawAttemptText() {
-    if (game.practice) return;
+    if (game.practice || game.infinite) return;
     const x = wx(game.attemptStartX + 4);
     if (x < -400) return;
     ctx.textAlign = 'left';
@@ -2610,7 +2720,7 @@
 
   // für Tests / Einbettung
   window.NeonHop = {
-    game, startLevel, startCustom, goMenu, mp, totalScore, save, writeSave, toast, show, drawCardArt, setTheme,
+    game, startLevel, startCustom, startInfinity, goMenu, mp, save, writeSave, toast, show, drawCardArt, setTheme,
     joinRoom: (code) => mpJoinCode(code),
     // Zeichnen für den Editor (benutzt dieselbe Kamera wie das Spiel)
     gfx: {

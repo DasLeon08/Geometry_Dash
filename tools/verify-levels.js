@@ -94,6 +94,9 @@ function snippet(def, x) {
   return lines.join('\n');
 }
 
+module.exports = { verify, snippet };
+if (require.main !== module) return;
+
 const only = process.argv[2] ? Number(process.argv[2]) : null;
 let failed = 0;
 LEVELS.forEach((def, i) => {
