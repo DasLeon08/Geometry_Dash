@@ -8,13 +8,23 @@ Rakete durch Tunnel und drehst die Schwerkraft um.
 
 ## Features
 
-- 30 Level in zwei Welten, jede von Leicht bis Extrem (Tabs „Welt 1 / Welt 2“ im Menü):
+- 50 Level in vier Welten, jede von Leicht bis Extrem (Tabs „Welt 1–4“ im Menü):
   - Welt 1: *Erster Sprung*, *Sonnenpfad*, *Kristallhöhle*, *Erster Flug*, *Neon-Himmel*,
     *Tiefsee*, *Vulkan*, *Polarlicht*, *Turbo-Tunnel*, *Umkehr*, *Schattenwerk*,
     *Sternenstaub*, *Glitch*, *Nachtschicht*, *Neon-Kern*
   - Welt 2 (neue Fähigkeiten): *Kugelblitz*, *Schwebeflug*, *Zickzack*, *Blechpark*,
     *Spinnennetz*, *Pendel*, *Portalsprung*, *Sägewerk*, *Wellenbrecher*, *Spiegelwelt*,
     *Nebelnacht*, *Kaleidoskop*, *Überladung*, *Sturmkern*, *Neon-Finale*
+  - Welt 3: *Morgenrot*, *Prisma*, *Echolot*, *Funkenflug*, *Gezeiten*, *Kettenreaktion*,
+    *Lichtjahr*, *Schwerelos*, *Donnerhall*, *Supernova*
+  - Welt 4: *Nordlicht*, *Zeitsprung*, *Polarwirbel*, *Leuchtfeuer*, *Fraktal*, *Hyperraum*,
+    *Sturmflut*, *Quantensprung*, *Ereignishorizont*, *Neon-Ewigkeit*
+- **Infinity-Modus**: eine endlose, jedes Mal neue Strecke, die alle 300 Kacheln schwerer
+  wird; Rangliste „Heute“ und „Allzeit“ auf dem eigenen Server, Bestwert auch auf Toki
+- Optik im Stil grosser Showcase-Level: Objekte fliegen ins Bild, wechselnde Hintergründe
+  (Quadrate, Ringe, Dreiecke, Gitter, Waben, Tunnel) mit Silhouetten-Ebene, Boden-Stile,
+  Schockwellen, Farbversatz, Glitch, Unschärfe, Kamera-Fahrten, Partikel – in allen Leveln
+  im Takt der Musik (Intro, Drop, Break, zweiter Drop)
 - 8 Spielmodi: Würfel, Rakete, Kugel, Ufo, Welle, Roboter, Spinne, Schaukel
   (Modus-Portale wirken über die ganze Höhe, man kann sie nicht umfliegen)
 - Sprungfelder (gelb, rosa, blau), Ringe (gelb, rosa, blau, grün, schwarz),
@@ -31,7 +41,8 @@ Rakete durch Tunnel und drehst die Schwerkraft um.
 - Designs: 16 Würfel-Gesichter und 12 Farben; die meisten schaltet man mit Münzen und
   geschafften Leveln frei (Knopf „Designs“ im Menü). Das Gesicht sieht man in jedem
   Modus, auch bei den Mitspielern
-- Effekte in allen Leveln: Farbwechsel, Blitz, Wackeln, Puls, Zoom, Neigen, Spiegeln, Dunkel
+- Effekt-Trigger (auch im Editor): Farbwechsel, Blitz, Wackeln, Puls, Zoom, Neigen, Spiegeln,
+  Dunkel, Schockwelle, Farbversatz, Glitch, Unschärfe, Kamera, Einflug, Hintergrund, Partikel
 - Grafik-Effekte: Sterne und Formen im Hintergrund (Parallax, pulsieren im Takt), leuchtende
   Spur, Staub beim Landen, Schockwellen an Ringen/Sprungfeldern/Portalen, glitzernde Münzen,
   Würfel zerspringt beim Tod, Konfetti und kurze Zeitlupe im Ziel. Im Menü umschaltbar auf
@@ -111,11 +122,25 @@ Das Spiel funktioniert auch in einem `<iframe>`:
 <iframe src="/games/neon-hop/index.html" allow="autoplay; fullscreen" style="border:0;width:100%;aspect-ratio:16/9"></iframe>
 ```
 
-## Toki-Bestenliste
+## Toki-Bestenliste und Infinity-Rangliste
 
-Nach jedem Tod und jedem Zieleinlauf im normalen Modus meldet das Spiel
-`toki.score(punkte)`. Die Punkte sind die **Summe der Bestwerte aller Level**
-(0–100 % pro Level, also bis zu 1500 Punkte für alle 15 Level). Übungsmodus zählt nicht.
+Das Spiel meldet `toki.score(punkte)` mit dem **besten Infinity-Lauf** (Distanz in Kacheln),
+sobald ein neuer Bestwert erreicht ist. Die Level zählen nicht mehr für die Toki-Bestenliste.
+
+Dazu gibt es eine eigene Rangliste auf dem Server (Pokal im Menü oder „Rangliste“ nach einem
+Lauf), mit „Heute“ (neuer Tag um Mitternacht UTC) und „Allzeit“, Top 50 und eigenem Rang:
+
+- Vor dem Lauf holt das Spiel beim Server einen Seed und eine Lauf-ID
+  (`POST /api/infinity/start`). Ohne Server läuft Infinity trotzdem, zählt aber nur lokal.
+- Nach dem Tod schickt es die Tastendrücke (`POST /api/infinity/submit`). Der Server spielt
+  den Lauf mit `js/infinite.js` nach und bestimmt die Distanz selbst; jede Lauf-ID zählt
+  einmal und verfällt nach 2 Stunden. Pro Spieler (geheimer Schlüssel im Browser, der Server
+  speichert nur einen Hash) zählt der beste Lauf. Namen werden gefiltert.
+- Unter `/admin` lassen sich Einträge entfernen.
+
+**Fortschritt zurückgesetzt (Version 2):** Wegen der umgebauten Level beginnen Bestwerte,
+Münzen und Designs neu (`SAVE_VER` in `js/game.js`). Name, Ton, Effekt-Einstellung und
+Editor-Entwürfe bleiben.
 
 ## Mehrspieler
 
@@ -220,7 +245,8 @@ jedem Neustart weg (die Gesundheitsseite `/health` zeigt das an).
 
 `https://neonhop-server.onrender.com/admin` öffnen und das `ADMIN_TOKEN` eingeben (Render
 erzeugt es selbst, zu finden unter **Environment**). Dort siehst du gemeldete und neue Level
-und kannst sie verstecken, wieder freigeben oder löschen.
+und kannst sie verstecken, wieder freigeben oder löschen. Darunter steht die
+Infinity-Rangliste (Allzeit, Top 100); einzelne Einträge kannst du entfernen.
 
 ## Level bearbeiten
 
@@ -251,7 +277,9 @@ erreichbar sind.
 | Datei | Inhalt |
 | --- | --- |
 | `js/engine.js` | Physik und Kollisionen (läuft auch in Node) |
-| `js/levels.js` | Level-Daten |
+| `js/kit.js` | Bausteine für Level-Abschnitte (Level und Infinity) |
+| `js/levels.js` | Level-Daten und Effekt-Drehbuch (`autoFx2`) |
+| `js/infinite.js` | Infinity-Generator (Seed → endlose Strecke) und Nachspielen |
 | `js/audio.js` | Musik-Sequenzer und Soundeffekte |
 | `js/game.js` | Grafik, Eingabe, Menüs, Speicherstand, Mehrspieler-Lobby und Rennen |
 | `js/multiplayer.js` | Verbindung zum Mehrspieler-Server |
@@ -260,9 +288,11 @@ erreichbar sind.
 | `js/community.js` | Online-Level: Entdecken, Veröffentlichen, Likes, Meldungen |
 | `server/server.js` | Mehrspieler-Server (WebSocket) und HTTP |
 | `server/levels.js` | Level-API: prüft und spielt Läufe nach |
+| `server/infinity.js` | Infinity-Rangliste: Seeds, Nachspielen, Ränge |
 | `server/store.js` | Speicher: Postgres oder Arbeitsspeicher |
 | `server/filter.js` | Filter für Namen |
 | `tools/verify-levels.js` | Prüft, ob alle Level schaffbar sind |
+| `tools/verify-infinite.js` | Prüft alle Infinity-Muster und viele Seeds |
 
 ## Hinweis
 

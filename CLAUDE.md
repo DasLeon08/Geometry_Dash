@@ -35,3 +35,9 @@
   `THEMES` in `server/levels.js`). Effekte in eingebauten Leveln über `fx()`-Marken oder `autoFx`.
 - Designs: `FACE_COUNT`, `PLAYER_COLORS`, `UNLOCKS` in `js/game.js`; Gesicht wird über
   `cubeOn()` gezeichnet und im Mehrspieler als `icon` mitgeschickt (geprüft).
+- Optik: Trigger `shock/chroma/glitch/blur/camera/area/bg/particles` (nur Renderer), Grundstimmung
+  `def.look`, Effekt-Drehbuch im Takt `autoFx2` in `js/levels.js`. Spielstand-Version `SAVE_VER`
+  in `js/game.js` (erhöhen setzt Fortschritt zurück).
+- Infinity: Bausteine in `js/kit.js`, Generator `js/infinite.js` (eigener Zufall aus dem Seed,
+  deterministisch), `Engine.extendLevel`; Rangliste `server/infinity.js`. Nach Änderungen an
+  Mustern: `node tools/verify-infinite.js`. Toki-Score = bester Infinity-Lauf.
