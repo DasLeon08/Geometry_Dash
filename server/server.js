@@ -32,6 +32,8 @@ const { createStore } = require('./store');
 const { createLevelApi } = require('./levels');
 // Dieselbe Spielphysik wie im Spiel: damit werden veröffentlichte Läufe nachgespielt
 const engine = require(path.join(__dirname, '..', 'js', 'engine.js'));
+// Infinity-Generator: damit werden Läufe für die Rangliste nachgespielt
+const infinite = require(path.join(__dirname, '..', 'js', 'infinite.js'));
 
 const PORT = Number(process.env.PORT) || 8787;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -72,7 +74,7 @@ function originAllowed(origin) {
 
 const store = createStore();
 const levelApi = createLevelApi({
-  store, engine, originAllowed, adminToken: process.env.ADMIN_TOKEN || '',
+  store, engine, infinite, originAllowed, adminToken: process.env.ADMIN_TOKEN || '',
   log: (m) => console.log(m),
 });
 

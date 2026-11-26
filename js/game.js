@@ -2720,7 +2720,7 @@
 
   // für Tests / Einbettung
   window.NeonHop = {
-    game, startLevel, startCustom, startInfinity, goMenu, mp, save, writeSave, toast, show, drawCardArt, setTheme,
+    game, startLevel, startCustom, startInfinity, prefetchInfinity, goMenu, mp, save, writeSave, toast, show, drawCardArt, setTheme,
     joinRoom: (code) => mpJoinCode(code),
     // Zeichnen für den Editor (benutzt dieselbe Kamera wie das Spiel)
     gfx: {

@@ -10,6 +10,7 @@
  *   GET  /api/admin/levels?filter=gemeldet|neu               Kopfzeile x-admin-token
  *   POST /api/admin/levels/:id/hide | show | delete
  *   GET  /admin                                              Verwaltungsseite
+ *   /api/infinity/…                                          Infinity-Rangliste (server/infinity.js)
  *
  * Ein Level wird nur gespeichert, wenn der mitgeschickte Lauf (replay) mit der
  * Spielphysik aus js/engine.js nachgespielt das Ziel erreicht.
@@ -21,6 +22,7 @@ const fs = require('fs');
 const path = require('path');
 const { cleanText, isBlocked } = require('./filter');
 const { publicLevel } = require('./store');
+const { createInfinityApi } = require('./infinity');
 
 const ROWS = 10;
 const MIN_COLS = 30;
@@ -28,6 +30,7 @@ const MAX_COLS = 1012;
 const MIN_OBJECTS = 5;
 const MAX_TOGGLES = 50000;
 const MAX_BODY = 64 * 1024;
+const MAX_BODY_INFINITY = 256 * 1024;   // lange Infinity-Läufe haben viele Tastendrücke
 const HIDE_AT_REPORTS = 5;
 const THEMES = 50;   // Farben/Musik der eingebauten Level (Welt 1–4)
 
@@ -65,7 +68,11 @@ function limiter(max, windowMs) {
   };
 }
 
-function createLevelApi({ store, engine, originAllowed, adminToken, log }) {
+function createLevelApi({ store, engine, infinite, originAllowed, adminToken, log }) {
+  const inf = infinite ? createInfinityApi({ store, infinite, log }) : null;
+  const limitInfStart = limiter(30, 60 * 1000);
+  const limitInfSubmit = limiter(10, 60 * 1000);   // mehrere Spieler im selben WLAN teilen eine Adresse
+  const limitInfDay = limiter(300, 24 * 60 * 60 * 1000);
   const allowedChars = new Set(Object.keys(engine.CHAR_TYPES).concat('.'));
   const limitPublish = limiter(5, 60 * 60 * 1000);
   const limitGeneral = limiter(120, 60 * 1000);
@@ -106,8 +113,14 @@ function createLevelApi({ store, engine, originAllowed, adminToken, log }) {
     res.end(status === 204 ? '' : JSON.stringify(obj));
   }
   function fail(res, status, code, origin) { send(res, status, { error: code, message: MESSAGES[code] || code }, origin); }
+  /** Antwort aus server/infinity.js: { status, body } oder { status, error, message } */
+  function reply(res, r, origin) {
+    if (r.error) send(res, r.status, { error: r.error, message: r.message || MESSAGES[r.error] || r.error }, origin);
+    else send(res, r.status, r.body, origin);
+  }
 
-  function readBody(req) {
+  function readBody(req, maxBody) {
+    const MAX = maxBody || MAX_BODY;
     return new Promise((resolve) => {
       let size = 0;
       const chunks = [];
@@ -116,7 +129,7 @@ function createLevelApi({ store, engine, originAllowed, adminToken, log }) {
         if (tooBig) return;
         size += c.length;
         // zu gross: sofort ablehnen, Rest nicht mehr ansehen (Verbindung wird nach der Antwort getrennt)
-        if (size > MAX_BODY) { tooBig = true; chunks.length = 0; resolve(null); return; }
+        if (size > MAX) { tooBig = true; chunks.length = 0; resolve(null); return; }
         chunks.push(c);
       });
       req.on('end', () => {
@@ -195,6 +208,12 @@ function createLevelApi({ store, engine, originAllowed, adminToken, log }) {
           send(res, 200, { items: await store.adminList(url.searchParams.get('filter') === 'gemeldet' ? 'gemeldet' : 'neu') }, corsOrigin);
           return true;
         }
+        if (inf && parts[2] === 'infinity') {
+          const r = req.method === 'GET' && !parts[3] ? await inf.adminList()
+            : req.method === 'POST' && parts[3] && parts[4] === 'delete' ? await inf.adminDelete(parts[3].slice(0, 24)) : { status: 404, error: 'notfound' };
+          reply(res, r, corsOrigin);
+          return true;
+        }
         if (req.method === 'POST' && parts[2] === 'levels' && parts[3] && parts[4]) {
           const id = parts[3].slice(0, 20);
           let ok = false;
@@ -204,6 +223,32 @@ function createLevelApi({ store, engine, originAllowed, adminToken, log }) {
           if (!ok) { fail(res, 404, 'notfound', corsOrigin); return true; }
           log('Verwaltung: ' + parts[4] + ' ' + id);
           send(res, 200, { ok: true }, corsOrigin);
+          return true;
+        }
+        fail(res, 404, 'notfound', corsOrigin);
+        return true;
+      }
+      // ----- Infinity-Rangliste -----
+      if (inf && parts[1] === 'infinity') {
+        if (req.method === 'POST' && parts[2] === 'start') {
+          if (!limitInfStart(ip)) { fail(res, 429, 'rate', corsOrigin); return true; }
+          reply(res, inf.start(), corsOrigin);
+          return true;
+        }
+        if (req.method === 'GET' && parts[2] === 'top') {
+          reply(res, await inf.top(url.searchParams.get('range'), url.searchParams.get('player') || ''), corsOrigin);
+          return true;
+        }
+        if (req.method === 'POST' && parts[2] === 'submit') {
+          const body = await readBody(req, MAX_BODY_INFINITY);
+          if (body === null) {
+            res.setHeader('connection', 'close');
+            res.on('finish', () => req.destroy());
+            fail(res, 413, 'body', corsOrigin);
+            return true;
+          }
+          if (!limitInfSubmit(ip) || !limitInfDay(ip)) { fail(res, 429, 'rate', corsOrigin); return true; }
+          reply(res, await inf.submit(body), corsOrigin);
           return true;
         }
         fail(res, 404, 'notfound', corsOrigin);

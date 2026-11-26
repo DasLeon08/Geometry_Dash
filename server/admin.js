@@ -54,5 +54,38 @@
   }
   $('reported').onclick = () => { filter = 'gemeldet'; $('reported').className = ''; $('newest').className = 'ghost'; load(); };
   $('newest').onclick = () => { filter = 'neu'; $('newest').className = ''; $('reported').className = 'ghost'; load(); };
-  if ($('token').value) load();
+  // ----- Infinity-Rangliste -----
+  async function loadInf() {
+    $('infStatus').textContent = 'Lade …';
+    try {
+      const data = await api('/api/admin/infinity');
+      const tb = $('infList');
+      tb.textContent = '';
+      data.items.forEach((e) => {
+        const tr = document.createElement('tr');
+        [e.rank, e.name, e.distance + ' m', new Date(e.created).toLocaleString('de-CH')].forEach((v, i) => {
+          const td = document.createElement('td');
+          td.textContent = String(v);
+          if (i === 0 || i === 2) td.className = 'n';
+          tr.appendChild(td);
+        });
+        const td = document.createElement('td');
+        const del = document.createElement('button');
+        del.textContent = 'Entfernen';
+        del.className = 'danger';
+        del.onclick = async () => {
+          if (!del.dataset.armed) { del.dataset.armed = '1'; del.textContent = 'Sicher?'; return; }
+          try { await api('/api/admin/infinity/' + encodeURIComponent(e.id) + '/delete', 'POST'); loadInf(); } catch (err) { $('infStatus').textContent = err.message; }
+        };
+        td.appendChild(del);
+        tr.appendChild(td);
+        tb.appendChild(tr);
+      });
+      $('infStatus').textContent = data.items.length ? data.items.length + ' Einträge' : 'Noch keine Einträge.';
+    } catch (e) {
+      $('infStatus').textContent = e.message;
+    }
+  }
+  $('infLoad').onclick = loadInf;
+  if ($('token').value) { load(); loadInf(); }
 })();

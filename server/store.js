@@ -39,6 +39,35 @@ class MemoryStore {
     this.kind = 'memory';
     this.levels = new Map();
     this.votes = new Set();
+    this.infAll = new Map();   // Spieler -> { player, name, distance, created_at }
+    this.infDay = new Map();   // Tag|Spieler -> { player, day, name, distance, created_at }
+  }
+  // ----- Infinity-Rangliste (pro Spieler zählt der beste Lauf, je Tag und insgesamt) -----
+  async infSave({ player, name, distance, day, at }) {
+    const a = this.infAll.get(player);
+    if (!a || distance > a.distance) this.infAll.set(player, { player, name, distance, created_at: at });
+    else a.name = name;
+    const k = day + '|' + player, d = this.infDay.get(k);
+    if (!d || distance > d.distance) this.infDay.set(k, { player, day, name, distance, created_at: at });
+    else d.name = name;
+  }
+  infRows(range, day) {
+    return range === 'day' ? [...this.infDay.values()].filter((r) => r.day === day) : [...this.infAll.values()];
+  }
+  async infTop(range, day, limit) {
+    return this.infRows(range, day).sort((a, b) => b.distance - a.distance || a.created_at - b.created_at).slice(0, limit);
+  }
+  async infRank(range, day, player) {
+    const rows = this.infRows(range, day);
+    const me = rows.find((r) => r.player === player);
+    if (!me) return null;
+    // bei gleicher Distanz liegt der frühere Lauf vorne (wie in der Liste)
+    return { rank: 1 + rows.filter((r) => r.distance > me.distance || (r.distance === me.distance && r.created_at < me.created_at)).length, distance: me.distance };
+  }
+  async infRemove(player) {
+    const had = this.infAll.delete(player);
+    for (const k of [...this.infDay.keys()]) if (k.endsWith('|' + player)) this.infDay.delete(k);
+    return had;
   }
   async init() {}
   async findDuplicate(authorHash, data) {
@@ -136,12 +165,60 @@ class PgStore {
       hidden boolean not null default false,
       created_at bigint not null
     )`);
+    await this.q(`create table if not exists infinity_best (
+      player text primary key,
+      name text not null,
+      distance integer not null,
+      created_at bigint not null
+    )`);
+    await this.q(`create table if not exists infinity_day (
+      player text not null,
+      day text not null,
+      name text not null,
+      distance integer not null,
+      created_at bigint not null,
+      primary key (player, day)
+    )`);
     await this.q(`create table if not exists level_votes (
       level_id text not null,
       voter text not null,
       kind text not null,
       primary key (level_id, voter, kind)
     )`);
+  }
+  // ----- Infinity-Rangliste -----
+  async infSave({ player, name, distance, day, at }) {
+    const a = await this.q('select distance from infinity_best where player = $1', [player]);
+    if (!a.rows.length) await this.q('insert into infinity_best (player, name, distance, created_at) values ($1, $2, $3, $4)', [player, name, distance, at]);
+    else if (distance > Number(a.rows[0].distance)) await this.q('update infinity_best set name = $2, distance = $3, created_at = $4 where player = $1', [player, name, distance, at]);
+    else await this.q('update infinity_best set name = $2 where player = $1', [player, name]);
+    const d = await this.q('select distance from infinity_day where player = $1 and day = $2', [player, day]);
+    if (!d.rows.length) await this.q('insert into infinity_day (player, day, name, distance, created_at) values ($1, $2, $3, $4, $5)', [player, day, name, distance, at]);
+    else if (distance > Number(d.rows[0].distance)) await this.q('update infinity_day set name = $3, distance = $4, created_at = $5 where player = $1 and day = $2', [player, day, name, distance, at]);
+    else await this.q('update infinity_day set name = $3 where player = $1 and day = $2', [player, day, name]);
+  }
+  async infTop(range, day, limit) {
+    const r = range === 'day'
+      ? await this.q('select player, name, distance, created_at from infinity_day where day = $1 order by distance desc, created_at asc limit $2', [day, limit])
+      : await this.q('select player, name, distance, created_at from infinity_best order by distance desc, created_at asc limit $1', [limit]);
+    return r.rows.map((x) => ({ player: x.player, name: x.name, distance: Number(x.distance), created_at: Number(x.created_at) }));
+  }
+  async infRank(range, day, player) {
+    const me = range === 'day'
+      ? await this.q('select distance, created_at from infinity_day where player = $1 and day = $2', [player, day])
+      : await this.q('select distance, created_at from infinity_best where player = $1', [player]);
+    if (!me.rows.length) return null;
+    const dist = Number(me.rows[0].distance), at = Number(me.rows[0].created_at);
+    // bei gleicher Distanz liegt der frühere Lauf vorne (wie in der Liste)
+    const n = range === 'day'
+      ? await this.q('select count(*) as n from infinity_day where day = $1 and (distance > $2 or (distance = $2 and created_at < $3))', [day, dist, at])
+      : await this.q('select count(*) as n from infinity_best where distance > $1 or (distance = $1 and created_at < $2)', [dist, at]);
+    return { rank: 1 + Number(n.rows[0].n), distance: dist };
+  }
+  async infRemove(player) {
+    const r = await this.q('delete from infinity_best where player = $1', [player]);
+    await this.q('delete from infinity_day where player = $1', [player]);
+    return r.rowCount > 0;
   }
   async findDuplicate(authorHash, data) {
     const r = await this.q('select id from levels where author_hash = $1 and data = $2 limit 1', [authorHash, data]);

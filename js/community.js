@@ -41,6 +41,11 @@
       k = { author: randomKey(), voter: randomKey() };
       try { localStorage.setItem(KEYS, JSON.stringify(k)); } catch (e) { /* egal */ }
     }
+    if (!valid(k.player)) {
+      // Spieler-Schlüssel für die Infinity-Rangliste (der Server speichert nur einen Hash)
+      k.player = randomKey();
+      try { localStorage.setItem(KEYS, JSON.stringify(k)); } catch (e) { /* egal */ }
+    }
     return k;
   }
   function likedSet() {
@@ -287,5 +292,48 @@
     if (base) fetch(base + '/health', { mode: 'no-cors', cache: 'no-store' }).catch(() => {});
   });
 
-  window.NeonCommunity = { showFind, publish, unpublish, apiBase };
+  // ---------------------------------------------------------------------
+  // Infinity-Rangliste
+  // ---------------------------------------------------------------------
+  function infinityStart() { return api('/api/infinity/start', 'POST', {}); }
+  function infinitySubmit(run, replay) {
+    const name = (NH.save.name || '').trim() || 'Spieler';
+    return api('/api/infinity/submit', 'POST', { run, replay, name, playerKey: keys().player });
+  }
+  let boardRange = 'day';
+  async function showBoard(range) {
+    if (range) boardRange = range;
+    $('bdDay').classList.toggle('on', boardRange === 'day');
+    $('bdAll').classList.toggle('on', boardRange === 'all');
+    const list = $('bdList');
+    list.textContent = '';
+    $('bdMe').textContent = '';
+    $('bdStatus').textContent = 'Lade …';
+    NH.show('board', true);
+    try {
+      const r = await api('/api/infinity/top?range=' + boardRange + '&player=' + keys().player);
+      $('bdStatus').textContent = r.items.length ? '' : 'Noch niemand eingetragen – sei die oder der Erste!';
+      r.items.forEach((e) => {
+        const li = document.createElement('li');
+        if (e.me) li.className = 'me';
+        const rank = document.createElement('b'); rank.textContent = String(e.rank);
+        const name = document.createElement('span'); name.textContent = String(e.name).slice(0, 16);
+        const dist = document.createElement('em'); dist.textContent = Number(e.distance) + ' m';
+        li.append(rank, name, dist);
+        list.appendChild(li);
+      });
+      if (r.me) $('bdMe').textContent = 'Dein Rang: ' + r.me.rank + ' (' + r.me.distance + ' m)';
+      else $('bdMe').textContent = boardRange === 'day' ? 'Heute noch kein Lauf von dir.' : 'Noch kein Lauf von dir.';
+    } catch (e) {
+      $('bdStatus').textContent = e.message;
+    }
+  }
+  $('bdDay').onclick = () => { A.sfx('click'); showBoard('day'); };
+  $('bdAll').onclick = () => { A.sfx('click'); showBoard('all'); };
+  $('bdClose').onclick = () => { A.sfx('click'); NH.show('board', false); };
+  $('infBoard').onclick = () => { A.sfx('click'); showBoard(); };
+  $('boardBtn').onclick = () => { A.sfx('click'); showBoard(); };
+
+  window.NeonCommunity = { showFind, publish, unpublish, apiBase, infinityStart, infinitySubmit, showBoard };
+  if (NH.prefetchInfinity) NH.prefetchInfinity();
 })();

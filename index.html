@@ -273,6 +273,22 @@
     .worlds .inf-btn b { font-size: 18px; }
     .worlds .inf-btn span { color: #fff; opacity: .85; }
     #infResult .title { font-size: 44px; }
+    .worlds .board-btn { width: 34px; padding: 0; display: inline-grid; place-items: center; }
+    .worlds .board-btn svg.i { width: 18px; height: 18px; color: #d49a00; }
+    #board .panel { width: min(440px, 100%); max-height: 100%; display: flex; flex-direction: column; }
+    #board { z-index: 30; }
+    .bd-tabs { display: flex; gap: 8px; justify-content: center; margin: 4px 0 10px; }
+    .bd-tabs button { height: 34px; padding: 0 16px; border-radius: 999px; font-weight: 700; color: var(--ink); background: #fff; border: 3px solid var(--ink); }
+    .bd-tabs button.on { background: var(--sun); }
+    .bd-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; max-height: 46vh; min-height: 60px; text-align: left; }
+    .bd-list li { display: grid; grid-template-columns: 38px 1fr auto; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 10px; font-weight: 600; }
+    .bd-list li:nth-child(odd) { background: rgba(0,0,0,0.04); }
+    .bd-list li b { color: var(--sub); }
+    .bd-list li:nth-child(1) b { color: #d49a00; }
+    .bd-list li em { font-style: normal; font-weight: 700; }
+    .bd-list li.me { background: var(--sun); }
+    .bd-status, .bd-me { margin: 8px 0 0; font-size: 14px; color: var(--sub); }
+    .bd-me { font-weight: 700; color: var(--ink); margin-bottom: 10px; }
     .inf-best { margin: 2px 0 4px; font-weight: 700; color: var(--sub); }
     .inf-best.new { color: #1fa85a; }
     .inf-rank { margin: 0 0 12px; font-size: 14px; color: var(--sub); min-height: 1.2em; }
@@ -678,6 +694,7 @@
             <button id="world3" role="tab">Welt 3</button>
             <button id="world4" role="tab">Welt 4</button>
             <button id="infBtn" class="inf-btn"><b>∞</b> Infinity <span id="infBtnBest"></span></button>
+            <button id="boardBtn" class="board-btn" aria-label="Infinity-Rangliste" title="Infinity-Rangliste"><svg class="i"><use href="#i-trophy"/></svg></button>
           </div>
         </div>
         <div class="menu-actions">
@@ -925,6 +942,18 @@
         <button class="tile" id="againBtn"><svg class="i"><use href="#i-restart"/></svg>Nochmal</button>
         <button class="tile" id="winMenuBtn"><svg class="i"><use href="#i-home"/></svg>Menü</button>
       </div>
+    </div>
+  </div>
+
+  <div id="board" class="overlay dim hidden">
+    <div class="panel">
+      <div class="eyebrow">Infinity</div>
+      <div class="title">Rangliste</div>
+      <div class="bd-tabs"><button id="bdDay" class="on">Heute</button><button id="bdAll">Allzeit</button></div>
+      <ol class="bd-list" id="bdList"></ol>
+      <p class="bd-status" id="bdStatus"></p>
+      <p class="bd-me" id="bdMe"></p>
+      <button class="btn-go" id="bdClose"><svg class="i"><use href="#i-check"/></svg>Schliessen</button>
     </div>
   </div>
 
