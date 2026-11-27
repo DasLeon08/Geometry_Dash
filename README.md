@@ -138,9 +138,11 @@ Lauf), mit „Heute“ (neuer Tag um Mitternacht UTC) und „Allzeit“, Top 50 
   speichert nur einen Hash) zählt der beste Lauf. Namen werden gefiltert.
 - Unter `/admin` lassen sich Einträge entfernen.
 
-**Fortschritt zurückgesetzt (Version 2):** Wegen der umgebauten Level beginnen Bestwerte,
-Münzen und Designs neu (`SAVE_VER` in `js/game.js`). Name, Ton, Effekt-Einstellung und
-Editor-Entwürfe bleiben.
+**Fortschritt zurückgesetzt:** Wegen der umgebauten Level beginnen Bestwerte, Münzen und
+Designs neu. Dafür speichert das Spiel unter einem neuen Schlüssel (`neonhop.save.v2`,
+`SAVE_KEY` in `js/game.js`); Name, Ton und Effekt-Einstellung werden aus `neonhop.save.v1`
+übernommen, Editor-Entwürfe bleiben. Alte Spielversionen (Cache, anderes Gerät) schreiben
+weiter in den alten Schlüssel und können den neuen Stand nicht löschen.
 
 ## Mehrspieler
 

@@ -36,8 +36,9 @@
 - Designs: `FACE_COUNT`, `PLAYER_COLORS`, `UNLOCKS` in `js/game.js`; Gesicht wird über
   `cubeOn()` gezeichnet und im Mehrspieler als `icon` mitgeschickt (geprüft).
 - Optik: Trigger `shock/chroma/glitch/blur/camera/area/bg/particles` (nur Renderer), Grundstimmung
-  `def.look`, Effekt-Drehbuch im Takt `autoFx2` in `js/levels.js`. Spielstand-Version `SAVE_VER`
-  in `js/game.js` (erhöhen setzt Fortschritt zurück).
+  `def.look`, Effekt-Drehbuch im Takt `autoFx2` in `js/levels.js`. Fortschritt zurücksetzen nur über
+  einen neuen Schlüssel `SAVE_KEY` (`neonhop.save.vN`) in `js/game.js`, nie über Felder im alten
+  Stand (alte Versionen schreiben sie ohne das Feld zurück, Toki synchronisiert das).
 - Infinity: Bausteine in `js/kit.js`, Generator `js/infinite.js` (eigener Zufall aus dem Seed,
   deterministisch), `Engine.extendLevel`; Rangliste `server/infinity.js`. Nach Änderungen an
   Mustern: `node tools/verify-infinite.js`. Toki-Score = bester Infinity-Lauf.

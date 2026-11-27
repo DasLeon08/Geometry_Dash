@@ -10,7 +10,11 @@
   const TS = 40;                 // Pixel pro Kachel (logisch)
   const WORLDS = 4;             // Welten im Menü (Tabs)
   const PLAYER_SCREEN_X = 7;     // Spieler steht so viele Kacheln vom linken Rand
-  const SAVE_KEY = 'neonhop.save.v1';
+  // Spielstand. Für einen Neustart des Fortschritts (grosser Level-Umbau) einen neuen Schlüssel
+  // nehmen statt alte Stände zu löschen: alte Spielversionen (Cache, anderes Gerät) schreiben
+  // weiter in ihren alten Schlüssel und können den neuen Stand so nie wieder löschen.
+  const SAVE_KEY = 'neonhop.save.v2';
+  const OLD_SAVE_KEY = 'neonhop.save.v1';
   const FONT = 'Fredoka, "Trebuchet MS", system-ui, sans-serif';
   const INK = '#1d1442';
   // Schrift für das Canvas vorladen (CSS lädt sie sonst erst bei Bedarf)
@@ -40,14 +44,16 @@
   // ---------------------------------------------------------------------
   // Speicherstand (nur im Browser des Spielers)
   // ---------------------------------------------------------------------
-  const SAVE_VER = 2;        // bei grossen Level-Umbauten erhöhen: setzt den Fortschritt zurück
+  let saveIsNew = false;     // true, wenn der Spielstand gerade erst angelegt wurde
   const save = loadSave();
-  // gewähltes Design muss freigeschaltet sein; bekannte Freischaltungen merken (ohne Meldung beim ersten Mal)
+  // gewähltes Design muss freigeschaltet sein; bekannte Freischaltungen merken (ohne Meldung beim ersten Mal).
+  // Nur speichern, wenn sich wirklich etwas geändert hat.
   (function fixDesign() {
-    if (!unlocked('face', save.icon)) save.icon = 0;
-    if (!unlocked('color', save.color)) save.color = 0;
-    if (!save.seen) save.seen = unlockedKeys();
-    writeSave();   // ein zurückgesetzter Stand wird gleich gespeichert (Toki gleicht ihn ab)
+    let changed = saveIsNew;
+    if (!unlocked('face', save.icon)) { save.icon = 0; changed = true; }
+    if (!unlocked('color', save.color)) { save.color = 0; changed = true; }
+    if (!save.seen) { save.seen = unlockedKeys(); changed = true; }
+    if (changed) writeSave();
   })();
   // Ganzzahl zwischen 0 und max, alles andere wird 0.
   function clampInt(v, max) {
@@ -56,17 +62,29 @@
   }
   // Der Spielstand kann von aussen kommen (z.B. von Toki zurückgespielt),
   // darum nur bekannte Felder mit geprüften Werten übernehmen.
+  function readJson(key) {
+    try { const v = JSON.parse(localStorage.getItem(key)); return v && typeof v === 'object' ? v : null; } catch (e) { return null; }
+  }
   function loadSave() {
-    let raw = null;
-    try { raw = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { raw = null; }
-    const data = { ver: SAVE_VER, levels: {}, color: 0, icon: 0, muted: false, name: '', seen: null };
-    if (!raw || typeof raw !== 'object') return data;
+    const data = { levels: {}, color: 0, icon: 0, muted: false, name: '', seen: null };
+    let raw = readJson(SAVE_KEY);
+    if (!raw) {
+      // Erster Start nach dem Umbau (oder ganz neu): Fortschritt beginnt neu,
+      // Name, Ton und Effekt-Einstellung aus dem alten Stand übernehmen.
+      saveIsNew = true;
+      const old = readJson(OLD_SAVE_KEY);
+      if (old) {
+        data.muted = old.muted === true;
+        data.name = typeof old.name === 'string' ? old.name.replace(/[\u0000-\u001f<>]/g, '').slice(0, 16) : '';
+        data.nameTyped = old.nameTyped === true;
+        data.fxReduced = old.fxReduced === true;
+      }
+      return data;
+    }
     data.muted = raw.muted === true;
     data.name = typeof raw.name === 'string' ? raw.name.replace(/[\u0000-\u001f<>]/g, '').slice(0, 16) : '';
     data.nameTyped = raw.nameTyped === true;
     data.fxReduced = raw.fxReduced === true;
-    // Neue Version der Level: Bestwerte, Münzen und Designs beginnen neu (Name, Ton, Effekte bleiben)
-    if (raw.ver !== SAVE_VER) return data;
     data.color = clampInt(raw.color, PLAYER_COLORS.length - 1);
     data.infBest = clampInt(raw.infBest, 1e7);
     data.icon = clampInt(raw.icon, FACE_COUNT - 1);
